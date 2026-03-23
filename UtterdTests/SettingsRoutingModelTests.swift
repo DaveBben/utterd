@@ -1,0 +1,97 @@
+import Foundation
+import Testing
+import Core
+@testable import Utterd
+
+// MARK: - Mock
+
+final class MockNotesServiceForSettings: NotesService, @unchecked Sendable {
+    nonisolated(unsafe) var listFoldersResult: [NotesFolder] = []
+    nonisolated(unsafe) var listFoldersError: Error?
+
+    func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder] {
+        if let error = listFoldersError { throw error }
+        return listFoldersResult
+    }
+
+    func createNote(title: String, body: String, in folder: NotesFolder?) async throws -> NoteCreationResult { fatalError() }
+    func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool { fatalError() }
+}
+
+// MARK: - Tests
+
+@Suite("SettingsRoutingModel")
+struct SettingsRoutingModelTests {
+
+    @MainActor
+    private func makeSettings() -> (UserSettings, String) {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        return (UserSettings(defaults: defaults), suiteName)
+    }
+
+    @Test("loadFolders success populates folders and clears loading and error")
+    @MainActor
+    func loadFoldersSuccess() async {
+        let (settings, suiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let service = MockNotesServiceForSettings()
+        service.listFoldersResult = [
+            NotesFolder(id: "1", name: "Work"),
+            NotesFolder(id: "2", name: "Personal"),
+        ]
+        let model = SettingsRoutingModel(notesService: service, settings: settings)
+
+        await model.loadFolders()
+
+        #expect(model.folders.count == 2)
+        #expect(model.folders[0].name == "Work")
+        #expect(model.folders[1].name == "Personal")
+        #expect(model.fetchError == nil)
+    }
+
+    @Test("loadFolders failure sets fetchError and clears folders")
+    @MainActor
+    func loadFoldersFailure() async {
+        let (settings, suiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let service = MockNotesServiceForSettings()
+        service.listFoldersError = NotesServiceError.automationPermissionDenied
+        let model = SettingsRoutingModel(notesService: service, settings: settings)
+
+        await model.loadFolders()
+
+        #expect(model.folders.isEmpty)
+        #expect(model.fetchError != nil)
+    }
+
+    @Test("validateSelection keeps selection when folder name is in list")
+    @MainActor
+    func validateSelectionMatchingFolder() async {
+        let (settings, suiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let service = MockNotesServiceForSettings()
+        service.listFoldersResult = [NotesFolder(id: "1", name: "Work")]
+        settings.defaultFolderName = "Work"
+        let model = SettingsRoutingModel(notesService: service, settings: settings)
+
+        await model.loadFolders()
+
+        #expect(settings.defaultFolderName == "Work")
+    }
+
+    @Test("validateSelection resets selection when folder name is not in list")
+    @MainActor
+    func validateSelectionStaleFolder() async {
+        let (settings, suiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let service = MockNotesServiceForSettings()
+        service.listFoldersResult = [NotesFolder(id: "1", name: "Work")]
+        settings.defaultFolderName = "DeletedFolder"
+        let model = SettingsRoutingModel(notesService: service, settings: settings)
+
+        await model.loadFolders()
+
+        #expect(settings.defaultFolderName == nil)
+    }
+}

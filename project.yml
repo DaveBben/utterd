@@ -1,0 +1,67 @@
+name: Utterd
+options:
+  bundleIdPrefix: com.bennett
+  deploymentTarget:
+    macOS: "15.0"
+  xcodeVersion: "26.0"
+  defaultConfig: Debug
+
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "6.2"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: true
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+
+packages:
+  Libraries:
+    path: Libraries
+
+targets:
+  Utterd:
+    type: application
+    platform: macOS
+    sources:
+      - path: Utterd
+    dependencies:
+      - package: Libraries
+        product: Core
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bennett.Utterd
+        INFOPLIST_FILE: Utterd/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Utterd/Resources/Utterd.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: true
+    info:
+      path: Utterd/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Utterd
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "15.0"
+        LSUIElement: true
+        NSSpeechRecognitionUsageDescription: "Utterd uses speech recognition to transcribe your voice memos."
+        NSAppleEventsUsageDescription: "Utterd needs permission to create notes in Apple Notes."
+
+  UtterdTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: UtterdTests
+        excludes:
+          - Fixtures/**
+      - path: UtterdTests/Fixtures
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - target: Utterd
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bennett.UtterdTests
+        GENERATE_INFOPLIST_FILE: true
