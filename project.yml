@@ -50,3 +50,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bennett.UtterdTests
+        GENERATE_INFOPLIST_FILE: true
