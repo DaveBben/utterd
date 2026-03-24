@@ -57,6 +57,10 @@ Utterd/
 - Use SwiftUI first, drop to AppKit via NSViewRepresentable only when necessary
 - Privacy manifest (PrivacyInfo.xcprivacy) must be kept current
 
+## Project References
+
+- `spec.md` — product requirements, user stories, and acceptance criteria
+
 ## Before Creating PR
 
 Build + test must pass:
