@@ -1,7 +1,7 @@
 # Utterd Spec
 
 **Date**: 2026-03-24
-**Status**: Draft
+**Status**: Approved
 **Author**: Dave
 
 ---
