@@ -60,6 +60,7 @@ Utterd/
 ## Project References
 
 - `spec.md` — product requirements, user stories, and acceptance criteria
+- `docs/architecture.md` — system architecture, decisions, and component design
 
 ## Before Creating PR
 
