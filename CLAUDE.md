@@ -1,70 +1,50 @@
-# CLAUDE.md
+## Project Identity
 
-This file provides guidance to Claude Code when working with this repository.
+A macOS menu bar daemon that automatically triages voice memos into Reminders, Calendar, and Notes.
+It monitors the iCloud Voice Memos sync directory, extracts embedded transcripts, classifies them
+via a language model (on-device or remote), and creates items in the destination apps — no manual
+intervention after setup. Built for a single productivity-minded user who wants voice capture as a
+reliable front door to their trusted systems.
 
-## Project Overview
+## Tech Stack and Codebase Map
 
-A macOS daemon that routes voice memos to Reminders, Calendar, and Notes
-
-A macOS app built with SwiftUI, @Observable, and Swift 6.2 concurrency.
-Minimum deployment target: macOS 15 (Sequoia).
-
-## Development Commands
-
-```bash
-# Build the app
-xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' build
-
-# Run tests (Swift Testing + XCTest)
-xcodebuild -scheme Utterd -destination 'platform=macOS' test
-
-# Build local SPM libraries only
-cd Libraries && swift build && swift test
-
-# Lint (if SwiftLint is installed)
-swiftlint lint --strict
-
-# Format (if swift-format is installed)
-swift-format format -i -r Utterd/ UtterdTests/ Libraries/
-```
-
-## Architecture
-
-- **Pattern**: SwiftUI + @Observable (Apple's native "MV" pattern)
-- **State**: @Observable classes owned via @State, shared via @Environment
-- **Concurrency**: Swift 6.2 strict concurrency with @MainActor default isolation
-- **Modularization**: Local Swift package in Libraries/ with feature targets
-- **Dependencies flow**: Features -> Core (unidirectional)
+- Language: Swift 6.2 (strict concurrency — `SWIFT_STRICT_CONCURRENCY: complete`)
+- UI: SwiftUI (macOS 15+) with @Observable pattern
+- Project generation: XcodeGen (`project.yml` → `Utterd.xcodeproj`)
+- Package manager: Swift Package Manager (local package in `Libraries/`)
+- Testing: Swift Testing (@Test, #expect) — XCTest only for legacy
+- Min deployment: macOS 15.0 (Sequoia); on-device LLM requires macOS 26+
 
 ### Directory Layout
 
-```
-Utterd/
-  App/           - @main entry, scenes, app-level config, commands
-  Features/      - One folder per feature/screen (View + Model pairs)
-  Core/          - Shared services, networking, persistence
-  UI/            - Design system, reusable SwiftUI components
-  AppKitBridges/ - NSViewRepresentable wrappers (only when needed)
-  Resources/     - Assets, PrivacyInfo.xcprivacy, Info.plist
-```
+- `Utterd/App/` — @main entry point, scenes, commands, settings
+- `Utterd/Features/` — Feature modules (View + Model pairs)
+- `Utterd/Core/` — Shared services, networking, persistence, app state
+- `Utterd/UI/` — Design system, reusable SwiftUI components
+- `Utterd/AppKitBridges/` — NSViewRepresentable wrappers (only when needed)
+- `Utterd/Resources/` — Assets, Info.plist, PrivacyInfo.xcprivacy
+- `Libraries/` — Local SPM package (`Core` target + `CoreTests`)
+- `UtterdTests/` — App-level unit tests
 
-## Key Conventions
+## Operational Commands
 
-- Use @Observable, NOT ObservableObject/@Published/@StateObject
-- Use Swift Testing (@Test, #expect) for new tests, NOT XCTest assertions
-- Use async/await and actors, NOT GCD (DispatchQueue/DispatchGroup)
-- Use AsyncSequence (Swift Async Algorithms), NOT Combine for new reactive code
-- Use SwiftUI first, drop to AppKit via NSViewRepresentable only when necessary
-- Privacy manifest (PrivacyInfo.xcprivacy) must be kept current
+- `xcodegen generate` — regenerate Xcode project from `project.yml`
+- `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' build` — full build
+- `xcodebuild -scheme Utterd -destination 'platform=macOS' test` — run all tests
+- `cd Libraries && swift build && swift test` — build and test local SPM package only
+- `swiftlint lint --strict` — lint (requires SwiftLint installed)
+- `swift-format format -i -r Utterd/ UtterdTests/ Libraries/` — format (requires swift-format installed)
 
-## Project References
+## Critical Constraints
 
-- `spec.md` — product requirements, user stories, and acceptance criteria
-- `docs/architecture.md` — system architecture, decisions, and component design
+- Use SwiftUI first; drop to AppKit via NSViewRepresentable only when necessary
+- Never modify or delete original voice memo files — only read from temporary copies
+- Build + test must pass before creating a PR: `xcodebuild -scheme Utterd -destination 'platform=macOS' build test`
 
-## Before Creating PR
+## Pointers to Deeper Docs
 
-Build + test must pass:
-```bash
-xcodebuild -scheme Utterd -destination 'platform=macOS' build test
-```
+- `spec.md` — product requirements, user stories, acceptance criteria, and pipeline stages
+- `docs/architecture.md` — system architecture, quality goals, tech stack rationale, and constraints
+- `README.md` — setup instructions and project overview
+- `project.yml` — XcodeGen project definition (targets, settings, dependencies)
+- `Libraries/Package.swift` — local SPM package definition
