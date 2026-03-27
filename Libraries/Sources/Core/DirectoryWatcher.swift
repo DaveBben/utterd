@@ -10,6 +10,10 @@ public enum DirectoryWatcherError: Error, Sendable, Equatable {
     /// Insufficient permissions to read the directory.
     case permissionDenied(URL)
     /// The watched directory was deleted while the watcher was running.
+    ///
+    /// Currently reserved — when the directory is deleted at runtime, the `events`
+    /// stream terminates silently via `finish()`. A future error-reporting channel
+    /// (e.g., a delegate callback or separate error stream) could surface this case.
     case directoryDeleted(URL)
 }
 
@@ -55,6 +59,8 @@ public struct DirectoryWatcher: Sendable {
             // WatcherContext holds all mutable state and runs on the FSEvents dispatch queue.
             // Using @unchecked Sendable because access is serialized via the DispatchQueue.
             final class WatcherContext: @unchecked Sendable {
+                // Grows by one entry per .m4a file detected. At voice-memo creation
+                // rates (~tens per day), this is negligible for the app's lifetime.
                 var seenNames: Set<String>
                 let continuation: AsyncStream<URL>.Continuation
                 let directory: URL
@@ -99,17 +105,15 @@ public struct DirectoryWatcher: Sendable {
                 directory: directory
             )
 
-            // Retain the context as an unmanaged raw pointer for FSEvents callback info
+            // Retain the context as an unmanaged raw pointer for FSEvents callback info.
+            // Lifetime managed manually: passRetained here, release in onTermination.
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
             var fsContext = FSEventStreamContext(
                 version: 0,
                 info: contextPtr,
-                retain: { ptr in ptr },
-                release: { ptr in
-                    guard let ptr else { return }
-                    Unmanaged<WatcherContext>.fromOpaque(ptr).release()
-                },
+                retain: nil,
+                release: nil,
                 copyDescription: nil
             )
 
@@ -147,10 +151,21 @@ public struct DirectoryWatcher: Sendable {
             FSEventStreamSetDispatchQueue(stream, queue)
             FSEventStreamStart(stream)
 
+            // Teardown must happen on the same queue the stream is scheduled on.
+            // Wrapping contextPtr for capture in the @Sendable closure.
+            final class ContextPtrBox: @unchecked Sendable {
+                let ptr: UnsafeMutableRawPointer
+                init(_ ptr: UnsafeMutableRawPointer) { self.ptr = ptr }
+            }
+            let contextBox = ContextPtrBox(contextPtr)
+
             continuation.onTermination = { _ in
-                FSEventStreamStop(streamBox.ref)
-                FSEventStreamInvalidate(streamBox.ref)
-                FSEventStreamRelease(streamBox.ref)
+                queue.async {
+                    FSEventStreamStop(streamBox.ref)
+                    FSEventStreamInvalidate(streamBox.ref)
+                    FSEventStreamRelease(streamBox.ref)
+                    Unmanaged<WatcherContext>.fromOpaque(contextBox.ptr).release()
+                }
             }
         }
     }

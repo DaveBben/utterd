@@ -58,8 +58,8 @@ struct DirectoryWatcherTests {
 
         async let events = collectEvents(from: watcher.events, count: 1, timeout: 5)
 
-        // Small delay to let FSEvents stream start
-        try await Task.sleep(for: .milliseconds(200))
+        // Allow FSEvents stream to register with the kernel before creating files
+        try await Task.sleep(for: .milliseconds(500))
         FileManager.default.createFile(atPath: fileURL.path, contents: nil)
 
         let received = await events
@@ -80,7 +80,8 @@ struct DirectoryWatcherTests {
 
         async let events = collectEvents(from: watcher.events, count: 1, timeout: 2)
 
-        try await Task.sleep(for: .milliseconds(200))
+        // Allow FSEvents stream to register with the kernel before creating files
+        try await Task.sleep(for: .milliseconds(500))
         FileManager.default.createFile(
             atPath: tmpDir.appendingPathComponent("notes.json").path, contents: nil)
         FileManager.default.createFile(
@@ -105,7 +106,8 @@ struct DirectoryWatcherTests {
 
         async let events = collectEvents(from: watcher.events, count: 5, timeout: 10)
 
-        try await Task.sleep(for: .milliseconds(200))
+        // Allow FSEvents stream to register with the kernel before creating files
+        try await Task.sleep(for: .milliseconds(500))
         for i in 1...5 {
             FileManager.default.createFile(
                 atPath: tmpDir.appendingPathComponent("memo\(i).m4a").path, contents: nil)
@@ -143,7 +145,8 @@ struct DirectoryWatcherTests {
         let newFileURL = tmpDir.appendingPathComponent("new.m4a")
 
         async let newEvents = collectEvents(from: watcher2.events, count: 1, timeout: 5)
-        try await Task.sleep(for: .milliseconds(200))
+        // Allow FSEvents stream to register with the kernel before creating files
+        try await Task.sleep(for: .milliseconds(500))
         FileManager.default.createFile(atPath: newFileURL.path, contents: nil)
 
         let received = await newEvents
@@ -221,7 +224,7 @@ struct DirectoryWatcherTests {
         }
 
         // Let FSEvents stream start
-        try await Task.sleep(for: .milliseconds(300))
+        try await Task.sleep(for: .milliseconds(500))
 
         // Cancel the consuming task
         task.cancel()
@@ -250,7 +253,7 @@ struct DirectoryWatcherTests {
             for await _ in watcher.events {}
         }
 
-        try await Task.sleep(for: .milliseconds(300))
+        try await Task.sleep(for: .milliseconds(500))
         task.cancel()
         await task.value
 
@@ -277,7 +280,7 @@ struct DirectoryWatcherTests {
 
         async let events = collectEvents(from: watcher.events, count: 1, timeout: 5)
 
-        try await Task.sleep(for: .milliseconds(300))
+        try await Task.sleep(for: .milliseconds(500))
 
         // Delete the directory while the watcher is running
         try FileManager.default.removeItem(at: tmpDir)
@@ -305,7 +308,8 @@ struct DirectoryWatcherTests {
 
         async let events = collectEvents(from: watcher.events, count: 1, timeout: 5)
 
-        try await Task.sleep(for: .milliseconds(200))
+        // Allow FSEvents stream to register with the kernel before creating files
+        try await Task.sleep(for: .milliseconds(500))
         FileManager.default.createFile(
             atPath: tmpDir.appendingPathComponent("first.m4a").path, contents: nil)
 
@@ -328,7 +332,8 @@ struct DirectoryWatcherTests {
 
         async let events = collectEvents(from: watcher.events, count: 1, timeout: 5)
 
-        try await Task.sleep(for: .milliseconds(200))
+        // Allow FSEvents stream to register with the kernel before creating files
+        try await Task.sleep(for: .milliseconds(500))
 
         // Create the .m4a file
         FileManager.default.createFile(atPath: m4aURL.path, contents: nil)
@@ -356,7 +361,8 @@ struct DirectoryWatcherTests {
 
         async let events = collectEvents(from: watcher.events, count: 20, timeout: 15)
 
-        try await Task.sleep(for: .milliseconds(200))
+        // Allow FSEvents stream to register with the kernel before creating files
+        try await Task.sleep(for: .milliseconds(500))
         for i in 1...20 {
             FileManager.default.createFile(
                 atPath: tmpDir.appendingPathComponent("burst\(i).m4a").path, contents: nil)
