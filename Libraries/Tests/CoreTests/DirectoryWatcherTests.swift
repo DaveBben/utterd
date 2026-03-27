@@ -342,4 +342,30 @@ struct DirectoryWatcherTests {
         #expect(received.count == 1)
         #expect(received.first?.lastPathComponent == "rename_test.m4a")
     }
+
+    // MARK: - Burst Test (Task 4)
+
+    @Test("20 .m4a files in rapid succession emit exactly 20 unique URLs")
+    func burstOf20Files() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let watcher = try DirectoryWatcher(directory: tmpDir)
+
+        async let events = collectEvents(from: watcher.events, count: 20, timeout: 15)
+
+        try await Task.sleep(for: .milliseconds(200))
+        for i in 1...20 {
+            FileManager.default.createFile(
+                atPath: tmpDir.appendingPathComponent("burst\(i).m4a").path, contents: nil)
+        }
+
+        let received = await events
+        #expect(received.count == 20)
+
+        let uniqueNames = Set(received.map { $0.lastPathComponent })
+        #expect(uniqueNames.count == 20)
+    }
 }
