@@ -1,385 +1,199 @@
-# Utterd Spec
+# Utterd — Project Spec
 
-**Date**: 2026-03-24
-**Status**: Approved
-**Author**: Dave
-
----
-
-## Why This Exists
-
-Capturing ideas, tasks, and events by voice is low friction, but the recordings accumulate untriaged — never reaching the systems (Reminders, Calendar, Notes) where they would actually be useful. For productivity-minded people who rely on trusted systems to manage commitments, every untriaged voice memo is a commitment at risk of being forgotten. The gap between capture and triage is entirely manual today, and that manual step is the reason memos pile up.
+**Last updated**: 2026-03-26
+**Status**: Draft
 
 ---
 
-## Scope
+## What This Project Does
 
-### In
-- Monitor `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` for new voice memo recordings
-- Extract the embedded transcript from voice memo audio files
-- Copy memo files to a temporary location for processing; clean up temporary copies after processing completes or fails
-- Deduplicate processing: track which files have been processed and skip them on subsequent runs
-- Classify each transcript as a reminder, calendar event, or note using a language model
-- Extract structured data from the transcript (target list/calendar/folder, dates, times, content) using a language model
-- Discover existing lists, calendars, and folders at runtime from Reminders, Calendar, and Notes
-- Create items in Reminders, Calendar, and Notes via system APIs
-- Route items to a default list/calendar/folder when no routing rule matches
-- Natural-language routing rules defined in a YAML configuration file, evaluated by the language model
-- macOS Foundation Model framework (available on macOS 26+) as the default language model provider
-- OpenAI-compatible remote endpoint as a fallback language model provider
-- Menu bar presence with a service status indicator
-- Settings accessible from the menu bar: language model provider, enabled services, launch at login
-- Alerts list accessible from the menu bar showing failed processing attempts
-- Quit option from the menu bar
-
-### Out (explicitly)
-- Mobile app — this is a desktop-only daemon
-- Graphical editor for routing rules — rules are edited as text in a YAML configuration file
-- Transcript generation from audio (speech-to-text) — v1 depends on transcripts already embedded in the audio file
-- Automatic retry of failed operations — failures are logged, not retried
-- Multiple user profiles or accounts — single-user tool
-- Full windowed application UI — interaction is limited to the menu bar
-- Remote telemetry or analytics — all data stays local
+Utterd is a macOS menu bar daemon that automatically triages voice memos into Reminders, Calendar, and Notes. It monitors the iCloud Voice Memos sync directory, extracts embedded transcripts, classifies them via a language model (on-device or remote), and creates items in the destination apps — no manual intervention after setup. Built for a single productivity-minded user who wants voice capture as a reliable front door to their trusted systems.
 
 ---
 
-## User Stories
-
-### US-00 — North Star: Hands-free voice memo triage
-As a productivity-minded person,
-I want my voice memos to automatically appear as the correct item in Reminders, Calendar, or Notes without any manual intervention,
-So that I can trust voice capture as a reliable front door to my productivity system.
-
-**Priority**: Must
-
-**Acceptance Criteria**
-- [ ] AC-00.1: A voice memo recorded on a phone and synced to the computer appears as a reminder, calendar event, or note in the correct app within 5 minutes of the file arriving on disk
-- [ ] AC-00.2: The created item contains the meaningful content of the original memo (title, body, date/time as applicable)
-- [ ] AC-00.3: No manual step is required between recording the memo and the item appearing in the destination app
-- [ ] AC-00.4: The same memo is never processed twice, even if the daemon restarts
+> **Note:** Tech Stack, Directory Structure, and Development Commands belong in CLAUDE.md,
+> not in SPEC.md. Do not duplicate them here — the project spec covers context that goes
+> beyond what CLAUDE.md provides.
 
 ---
 
-### US-01 — Menu bar daemon lifecycle
-As a user,
-I want the app to run as a menu bar agent with no dock icon or main window,
-So that it stays out of my way while running continuously in the background.
+## Project Goals
 
-**Priority**: Must
-
-**Acceptance Criteria**
-- [ ] AC-01.1: The app appears only as a menu bar icon — no dock icon and no main window
-- [ ] AC-01.2: The menu bar icon is always visible while the app is running
-- [ ] AC-01.3: Clicking the menu bar icon reveals a dropdown containing status, settings, alerts, and quit
-- [ ] AC-01.4: The app launches directly into the menu bar state with no splash screen or setup wizard
-- [ ] AC-01.5: Selecting quit from the dropdown stops all background processing and exits cleanly
+- Ship a working end-to-end pipeline: voice memo file appears on disk → correct item shows up in Reminders, Calendar, or Notes within 5 minutes, zero manual steps
+- Every memo processed exactly once — no duplicates, no misses, even across restarts and duplicate file events
+- Privacy by default: on-device LLM (macOS 26+) as the primary provider; remote endpoint only as a configured fallback
+- Eventually open-source the project — codebase must be clean, self-documenting, and easy for outside contributors to build and run
 
 ---
 
-### US-02 — First run: Granting permissions and validating prerequisites
-As a new user,
-I want clear feedback on what the app needs to function and what is missing,
-So that I can complete setup without guessing.
+## Quality Goals
 
-**Priority**: Must
-**Dependencies**: US-01 (menu bar shell must exist for alerts and status indicator)
-
-**Acceptance Criteria**
-- [ ] AC-02.1: On first launch, if the required disk access permission has not been granted, the app surfaces a message explaining the permission is needed and how to grant it
-- [ ] AC-02.2: If the voice memo sync directory does not exist or is inaccessible, an alert appears in the alerts list explaining the issue
-- [ ] AC-02.3: If no language model provider is available (neither on-device nor remote), an alert appears stating that memos cannot be processed until a provider is configured
-- [ ] AC-02.4: Once prerequisites are satisfied, the status indicator in the menu bar shows the service as active with no further user action
-- [ ] AC-02.5: If Reminders or Calendar access has not been granted, the app requests permission via the system prompt and explains why it is needed
-- [ ] AC-02.6: If Automation permission for Notes is required and has not been granted, an alert explains what permission is needed and how to grant it in System Settings
-
----
-
-### US-03 — Automatic file detection
-As a user,
-I want the app to detect new voice memos as soon as they appear in the sync directory,
-So that I do not need to trigger processing manually.
-
-**Priority**: Must
-**Dependencies**: US-08 (deduplication store must exist to evaluate files on launch), US-10 (alerts list for surfacing directory errors)
-
-**Acceptance Criteria**
-- [ ] AC-03.1: When a new audio file appears in `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings`, the app begins processing it automatically
-- [ ] AC-03.2: Files that existed in the directory before the app launched are evaluated against the deduplication store and processed only if new
-- [ ] AC-03.3: If the watched directory is removed or becomes inaccessible while the app is running, an alert is surfaced in the alerts list
-- [ ] AC-03.4: Once a new file is detected, it proceeds through the full processing pipeline (copy, transcript extraction, classification, data extraction, routing, item creation, deduplication recording) without manual intervention
-
----
-
-### US-04 — Transcript extraction
-As a user,
-I want the app to read the transcript embedded in my voice memo,
-So that the content can be classified and routed without me typing anything.
-
-**Priority**: Must
-
-**Acceptance Criteria**
-- [ ] AC-04.1: The app extracts the embedded transcript from a supported audio file without modifying the original file
-- [ ] AC-04.2: If a memo has no embedded transcript, the memo is skipped and an entry appears in the alerts list identifying the file and the reason
-- [ ] AC-04.3: The original audio file in the sync directory is never modified or deleted
-- [ ] AC-04.4: The app copies the audio file to a temporary location before extraction; all processing reads from the temporary copy, not the original. Temporary copies are cleaned up after processing completes or fails.
-
----
-
-### US-05 — Classification and data extraction
-As a user,
-I want each memo to be automatically classified as a reminder, calendar event, or note and have relevant details extracted,
-So that the item is created with the right type and content.
-
-**Priority**: Must
-**Dependencies**: US-09 (a language model provider must be configured)
-
-**Acceptance Criteria**
-- [ ] AC-05.1: Each transcript is classified into exactly one category: reminder, calendar event, or note
-- [ ] AC-05.2: For reminders, the extracted data includes at minimum a title; optionally a due date and target list
-- [ ] AC-05.3: For calendar events, the extracted data includes at minimum a title and date/time; optionally a target calendar and duration
-- [ ] AC-05.4: For notes, the extracted data includes at minimum a title and body; optionally a target folder
-- [ ] AC-05.5: If the language model returns an unrecognizable or ambiguous classification, the memo is routed to Notes as a default
-- [ ] AC-05.6: If the language model call fails entirely, the memo is logged in the alerts list and skipped
-
----
-
-### US-06 — Routing rules
-As a user,
-I want to define natural-language rules in a YAML configuration file that control where items are routed,
-So that memos about specific topics land in the right list, calendar, or folder automatically.
-
-**Priority**: Should
-**Dependencies**: US-05 (classification must produce structured data before routing can apply)
-
-**Acceptance Criteria**
-- [ ] AC-06.1: The app reads routing rules from a YAML configuration file on startup and when the file changes
-- [ ] AC-06.2: Each rule maps a natural-language condition to a destination (a specific list, calendar, or folder). The language model evaluates whether a transcript matches a rule's condition as part of the classification/extraction prompt.
-- [ ] AC-06.3: When a memo matches a rule, the item is created in the destination specified by that rule
-- [ ] AC-06.4: When no rule matches, the item is created in the default list, calendar, or folder for its category
-- [ ] AC-06.5: If the YAML configuration file is missing or malformed, the app uses defaults for all routing and surfaces a warning in the alerts list
-
----
-
-### US-07 — Item creation in destination apps
-As a user,
-I want reminders, calendar events, and notes to be created in the correct app with the extracted content,
-So that my voice memos become actionable items in my existing workflow.
-
-**Priority**: Must
-**Dependencies**: US-05 (structured data must be extracted before items can be created)
-
-**Acceptance Criteria**
-- [ ] AC-07.1: A classified reminder results in a new item in Reminders with the extracted title, due date (if any), and target list
-- [ ] AC-07.2: A classified calendar event results in a new event in Calendar with the extracted title, start time, duration (if any), and target calendar
-- [ ] AC-07.3: A classified note results in a new note in Notes with the extracted title, body, and target folder
-- [ ] AC-07.4: If creation fails (e.g., the target list/calendar/folder does not exist), the app falls back to the default destination for that category
-- [ ] AC-07.5: If creation still fails after fallback, the failure is logged in the alerts list with the memo identity and error reason
-
----
-
-### US-08 — Deduplication
-As a user,
-I want each voice memo to appear exactly once in my productivity system, even if the app restarts or duplicate file events occur,
-So that my systems stay clean and trustworthy.
-
-**Priority**: Must
-
-**Acceptance Criteria**
-- [ ] AC-08.1: After a memo is successfully processed, it is recorded in a local deduplication store
-- [ ] AC-08.2: If the same file appears again (same event, app restart, or re-sync), it is skipped without processing
-- [ ] AC-08.3: The deduplication store persists across app restarts
-- [ ] AC-08.4: If a user checks Reminders, Calendar, and Notes after the same memo file triggers multiple events, only one item exists
-
----
-
-### US-09 — Language model provider selection
-As a user,
-I want to choose between an on-device language model and a remote endpoint,
-So that I can use whichever provider is available or preferred.
-
-**Priority**: Must
-**Dependencies**: US-01 (settings menu is accessed from the menu bar dropdown)
-
-**Acceptance Criteria**
-- [ ] AC-09.1: The settings menu allows selecting between the on-device model and a remote endpoint
-- [ ] AC-09.2: When the on-device model is selected but unavailable, an alert is surfaced and processing pauses
-- [ ] AC-09.3: When the remote endpoint is selected, the app uses the configured endpoint URL and credentials
-- [ ] AC-09.4: Switching providers takes effect for the next memo processed, without requiring an app restart
-- [ ] AC-09.5: When the user selects or configures a remote endpoint, a notice is displayed stating that transcript text will be sent to the configured server
-
----
-
-### US-10 — Menu bar status and alerts
-As a user,
-I want to see at a glance whether the service is running and whether anything has failed,
-So that I can trust the system is working or know when it needs attention.
-
-**Priority**: Must
-**Dependencies**: US-01 (menu bar dropdown must exist)
-
-**Note**: US-10 owns the in-memory alerts list displayed in the menu bar. US-11 adds persistence beneath this list so alerts survive app restarts. Stories that reference "the alerts list" depend on US-10 for the UI surface.
-
-**Acceptance Criteria**
-- [ ] AC-10.1: The menu bar icon indicates whether the service is active, idle, or in an error state
-- [ ] AC-10.2: The menu bar dropdown shows a list of recent alerts (failed processing attempts)
-- [ ] AC-10.3: Each alert identifies the memo file, the failure stage, and the reason
-- [ ] AC-10.4: The status indicator transitions to an error state after 10 or more consecutive processing failures, and returns to active when a memo is processed successfully
-
----
-
-### US-11 — Failure logging
-As a user,
-I want all processing failures to be logged persistently,
-So that I can review what went wrong even after restarting the app.
-
-**Priority**: Should
-**Dependencies**: US-10 (provides the in-memory alert model that this story persists)
-
-**Acceptance Criteria**
-- [ ] AC-11.1: Every processing failure (transcript extraction, classification, item creation) is written to a persistent local log
-- [ ] AC-11.2: The log is human-readable and includes timestamps, file identifiers, failure stage, and error details
-- [ ] AC-11.3: On app launch, the alerts list in the menu bar is populated from the persistent log, so alerts survive restarts
-
----
-
-### US-12 — Launch at login
-As a user,
-I want the option to start the app automatically when I log in,
-So that I do not need to remember to launch it manually.
-
-**Priority**: Should
-**Dependencies**: US-01 (settings are accessed from the menu bar)
-
-**Acceptance Criteria**
-- [ ] AC-12.1: A toggle in settings enables or disables launch at login
-- [ ] AC-12.2: When enabled, the app starts in the background on login with no visible window
-- [ ] AC-12.3: When disabled, the app does not start on login
-
----
-
-## Recommended Implementation Order
-
-The user stories above are numbered for reference, not implementation sequence. The following order respects dependencies:
-
-1. **US-01** — Menu bar shell (all UI surfaces depend on this)
-2. **US-08** — Deduplication store (US-03 depends on this)
-3. **US-10** — Alerts list and status indicator (many stories surface alerts here)
-4. **US-03** — File detection + pipeline orchestration
-5. **US-04** — Transcript extraction (including temp copy)
-6. **US-09** — Language model provider selection
-7. **US-05** — Classification and data extraction
-8. **US-07** — Item creation
-9. **US-02** — First-run permission checks
-10. **US-06** — Routing rules
-11. **US-11** — Persistent failure logging
-12. **US-12** — Launch at login
-
----
-
-## Pipeline Stages
-
-The processing pipeline for each voice memo follows these stages in order:
-
-| Stage | Input | Output | Failure behavior |
-|---|---|---|---|
-| Detection | New file in watched directory | File path queued for processing | Alert if directory inaccessible |
-| Copy | Original file path | Temporary copy for safe processing | Skip memo, log alert |
-| Transcript extraction | Temporary audio file | Plain text transcript | Skip memo, log alert |
-| Classification | Transcript text | Category (reminder / event / note) | Skip memo, log alert |
-| Data extraction | Transcript text + category | Structured fields (title, date, list, etc.) | Skip memo, log alert |
-| Routing | Structured fields + routing rules | Target destination (specific or default) | Fall back to default destination |
-| Item creation | Structured fields + destination | Item in Reminders, Calendar, or Notes | Log alert, skip memo |
-| Deduplication record | Successful processing | Entry in deduplication store | — |
-| Cleanup | Temporary copy | Temporary file deleted | Log warning if cleanup fails |
-
----
-
-## Edge Cases
-
-- **Memo with no embedded transcript**: Skip the memo. Log an alert identifying the file and stating no transcript was found.
-- **Very long transcript exceeding language model input limits**: Truncate the transcript to fit within the provider's limits. Process with the truncated input. Log a warning if truncation occurred.
-- **Duplicate file system events for the same file**: The deduplication store prevents reprocessing. The second event is silently ignored.
-- **Watched directory does not exist (sync not configured)**: Surface an alert on startup and periodically. Do not crash. Resume automatically if the directory appears later.
-- **Language model returns ambiguous or unrecognizable classification**: Route the memo to Notes as the default category.
-- **Target list, calendar, or folder referenced by a routing rule no longer exists**: Fall back to the default destination for that category. Log a warning.
-- **Configuration file is edited while the app is running**: Reload rules and apply them to subsequent memos. Do not reprocess already-processed memos.
-- **Multiple memos arrive simultaneously**: Process them sequentially. Ordering does not need to match file creation order, but all must be processed.
-- **App is quit and relaunched**: On relaunch, scan the directory, check each file against the deduplication store, and process only new files.
-- **Disk is full and deduplication store cannot be written**: Log an alert. Do not process additional memos until the store can be updated (to prevent duplicates).
-- **Remote language model endpoint is unreachable**: Log an alert. Do not process memos. Resume automatically when the endpoint becomes reachable.
+| Priority | Goal | Rationale |
+|----------|------|-----------|
+| 1 | Reliability | A missed or duplicated memo erodes trust in the entire system — the user must never wonder "did that memo make it?" |
+| 2 | Privacy | Voice memos contain personal content; on-device processing is the default. Remote use requires informed consent |
+| 3 | Maintainability | Single developer, eventual open-source — code must be easy to understand and modify without tribal knowledge |
+| 4 | Operability | Every failure must be visible (menu bar alerts + persistent log) so the user knows when the system needs attention |
 
 ---
 
 ## Non-Functional Requirements
 
-| Category | Requirement |
-|---|---|
-| **Performance** | End-to-end processing of a single memo (from file detection to item creation) completes in under 60 seconds, excluding network latency for remote language model calls and iCloud Sync times. |
-| **Privacy** | When the on-device language model is used, no memo content leaves the machine. When a remote endpoint is used, the user is informed during configuration that transcript text will be sent to the configured server (see AC-09.5). |
-| **Security** | Credentials for remote language model endpoints are stored in the system keychain, not in plaintext configuration files. The app accesses only the directories and APIs it needs, despite having broad disk access permission. The App is protected against LLM prompt injection |
-| **Persistence** | The deduplication store and failure log persist across app restarts. Growth is bounded: entries older than 90 days may be pruned automatically. |
-| **Startup / lifecycle** | The app launches as a background agent (no dock icon, no main window). On launch it validates prerequisites, begins watching for files, and processes any unprocessed backlog. After a crash, relaunch and deduplication store ensure no duplicates and no missed memos. |
-| **Failure thresholds** | Each memo is attempted once. A failure at any pipeline stage results in a logged alert and the memo is skipped — no automatic retry. If 10 or more consecutive failures occur, the status indicator changes to an error state (see AC-10.4). |
-| **Supported environment** | Requires macOS 15 (Sequoia) or later. On-device language model (macOS Foundation Model framework) requires macOS 26 (Tahoe) or later. On macOS 15–25, the on-device model is unavailable; the app requires a configured remote endpoint to process memos and will surface an alert if no provider is available. |
-| **Reliability** | The app should remain running indefinitely without memory leaks or resource exhaustion. It must survive directory changes, language model unavailability, and API failures without crashing. |
+- **Performance**: End-to-end processing of a single memo completes in under 60 seconds, excluding network latency for remote LLM calls and iCloud sync time
+- **Privacy**: On-device LLM → no memo content leaves the machine. Remote LLM → user is explicitly informed that transcript text will be sent to the configured server
+- **Security**: Remote endpoint credentials stored in system Keychain only — never in plaintext config. App must be hardened against LLM prompt injection
+- **Persistence**: Deduplication store and failure log survive app restarts. Entries older than 90 days may be pruned automatically
+- **Failure thresholds**: Each memo attempted once. No automatic retry. 10+ consecutive failures → error state in status indicator
+- **Reliability**: App must run indefinitely without memory leaks or resource exhaustion. Must survive directory changes, LLM unavailability, and API failures without crashing
 
 ---
 
-## Success Criteria
+## Architecture Summary
 
-1. A voice memo recorded on a phone appears as the correct item (reminder, event, or note) in the correct destination app within 5 minutes of the file syncing to the computer — verified across 20 consecutive memos with zero misses (traces to US-00, US-03, US-05, US-07).
-2. Zero duplicate items are created from the same voice memo across 50 test runs including app restarts and simulated duplicate file events (traces to US-08).
-3. Zero manual intervention is required after initial setup — the user records a memo and the item appears without touching the computer (traces to US-00, US-02).
-4. 100% of processing failures appear in the alerts list with an identifiable file name and failure reason within 10 seconds of the failure (traces to US-10, US-11).
-5. Routing rules correctly direct memos to specified destinations for at least 95% of memos that match a rule, verified across a predefined test set of 20 memos with known expected destinations (traces to US-06, US-07).
+```
+iCloud Sync ──▶ [File Watcher] ──▶ [Pipeline] ──▶ Reminders (EventKit)
+  (.m4a files)        │                               Calendar  (EventKit)
+                      │                               Notes     (Scripting Bridge)
+                      ▼
+                 [LLM Provider]
+                  ├─ On-device (Foundation Model, macOS 26+)
+                  └─ Remote (OpenAI-compatible, HTTPS)
+```
 
-> **Note on transitive coverage:** Success criteria 1 and 3 transitively validate transcript extraction (US-04) and provider selection (US-09) as prerequisite capabilities — a memo cannot be processed end-to-end without both functioning correctly.
+**Key design patterns:**
+- Sequential pipes-and-filters pipeline — detection → copy → extraction → classification → data extraction → routing → creation → dedup → cleanup. Each stage is an isolated function with typed inputs/outputs
+- Protocol-based LLM provider abstraction — a Swift protocol defines the LLM interface; concrete types implement on-device and remote variants
+- Exactly-once processing via persistent dedup store — checked before processing, written after successful creation
 
----
-
-## Dependencies & Assumptions
-
-**Dependencies**
-- System APIs for programmatic creation of reminders and calendar events (EventKit — established platform API)
-- A mechanism for programmatic creation of notes in the Notes app (historically limited; may require scripting bridge)
-- macOS Foundation Model framework API availability on macOS 26+
-- File system event monitoring capability provided by the operating system (FSEvents)
-- Voice memos synced to the local file system via iCloud sync
-
-**Assumptions**
-
-| Assumption | Validation | Fallback if false |
-|---|---|---|
-| Voice memos recorded on a phone sync to `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` on the computer | Known iCloud sync behavior; verified on current OS versions | App surfaces an alert; does nothing if directory is empty or missing |
-| Voice memo audio files contain embedded transcripts | Tested on recent OS versions; transcripts are generated on-device during recording | v1 skips memos without transcripts and logs an alert; transcript generation is deferred to a future version |
-| The macOS Foundation Model framework on macOS 26 is available to apps with broad disk access (unsandboxed) | Based on public platform announcements | User configures a remote language model endpoint instead |
-| System APIs allow programmatic item creation in Reminders and Calendar | Established APIs (EventKit); well-documented | Surface error in alerts list |
-| Notes can be created programmatically with folder targeting | Historically possible via scripting bridge; less well-documented | Surface error in alerts; investigate alternative approaches |
-| Tech preferences: the project uses Swift 6.2, SwiftUI, strict concurrency, XcodeGen, local Swift package modularization, and Swift Testing | Team convention | N/A — these are project decisions, not runtime assumptions |
+**Data flow:**
+A new .m4a file arrives in the watched directory → copied to a temp location → embedded transcript extracted from the copy → transcript sent to LLM for classification + structured data extraction → routing rules applied → item created in destination app via system API → file identity recorded in dedup store → temp copy cleaned up.
 
 ---
 
-## Open Questions
+## Architecture Decisions
 
-- [ ] What is the exact format and location of the embedded transcript within voice memo audio files?
-  - Decision needed by: before implementing transcript extraction (first development sprint)
-- [ ] Is the macOS Foundation Model framework available to unsandboxed (non-App-Store) apps?
-  - Decision needed by: before finalizing language model provider abstraction
-- [ ] What are the limitations of programmatic access to Notes — can specific folders be targeted, and what content formatting is supported?
-  - Decision needed by: before implementing Notes integration
-- [ ] Where should the deduplication store live, and what format should it use? (e.g., Application Support directory, lightweight database, flat file)
-  - Decision needed by: before implementing deduplication
-- [ ] Where should the YAML routing rules configuration file live? (e.g., Application Support, ~/.config, or alongside the app)
-  - Decision needed by: before implementing configuration loading
-- [ ] What is the maximum transcript length the on-device language model can accept, and how should truncation be handled?
-  - Decision needed by: before implementing classification
+| Decision | Rationale | Date | Alternatives Considered |
+|----------|-----------|------|------------------------|
+| XcodeGen over committed .xcodeproj | Project will be open-sourced — keeps project definition human-readable, diffable, and merge-conflict-free | 2026-03-24 | Committing .xcodeproj — rejected for poor OSS contributor experience |
+| Local SPM package (`Libraries/`) for core logic | Encapsulation — isolates core logic from the app target, enables fast `swift test` without Xcode | 2026-03-24 | Everything in app target — rejected for lack of modularity |
+| Swift 6.2 strict concurrency (`complete`) | Eliminates data races at compile time; required for Foundation Model framework | 2026-03-24 | Relaxed concurrency — rejected, doesn't catch bugs early enough |
+| SwiftUI MenuBarExtra over AppKit NSStatusItem | Native SwiftUI integration, less boilerplate, aligns with @Observable pattern | 2026-03-24 | AppKit NSStatusItem — rejected unless SwiftUI proves insufficient |
+| @Observable over ObservableObject | Per-property view invalidation, less boilerplate, modern Swift pattern | 2026-03-24 | ObservableObject + @Published — legacy pattern |
+| Scripting Bridge for Notes | Only known mechanism for programmatic Notes access with folder targeting | 2026-03-24 | No alternative available |
+| Keychain for remote LLM credentials | macOS security standard — avoids plaintext secrets in config files | 2026-03-24 | Plaintext in YAML config — rejected for security |
 
 ---
 
-## Out of Scope (Clarification)
+## Code Conventions
 
-These items were discussed during requirements gathering and explicitly deferred:
+**Patterns to follow:**
+```swift
+// Models: @Observable + @MainActor + final class
+@Observable
+@MainActor
+final class SomeModel {
+    var items: [String] = []
+}
+```
 
-- **UI-based routing rule editor** — the text-based YAML configuration file is sufficient for the initial audience (the developer and power users). May be added in a future version if adoption grows beyond technical users.
-- **Transcript fallback via speech-to-text** — some older memos may lack embedded transcripts. Deferred to reduce v1 complexity. V1 skips memos without transcripts.
-- **Retry / reprocessing of failed memos** — deferred because the primary user can manually re-record or check the alerts list. A future version may add a "reprocess" action from the alerts list.
+```swift
+// Tests: Swift Testing with @Suite and @Test
+@Suite("SomeModel")
+struct SomeModelTests {
+    @Test("descriptive test name")
+    @MainActor
+    func someTest() {
+        // Arrange → Act → Assert using #expect
+    }
+}
+```
+
+```swift
+// State sharing: @State at the owner, @Environment for children
+@State private var appState = AppState()
+// ...
+.environment(appState)
+```
+
+**Patterns to avoid:**
+```swift
+// Do NOT use ObservableObject/@Published — use @Observable instead
+class BadModel: ObservableObject {
+    @Published var items: [String] = []  // ← legacy pattern
+}
+```
+
+---
+
+## Testing Strategy
+
+**Framework:** Swift Testing (`@Test`, `#expect`, `@Suite`)
+**Location:** `UtterdTests/` for app-level tests, `Libraries/Tests/CoreTests/` for library tests
+**Naming:** Test structs named `[Subject]Tests`, test functions describe the behavior being verified
+
+**Test types:**
+- **Unit tests (app)**: `xcodebuild -scheme Utterd -destination 'platform=macOS' test`
+- **Unit tests (library)**: `cd Libraries && swift test` — fast, no Xcode required
+
+**Testing conventions:**
+- Use Swift Testing exclusively for new tests — XCTest only for legacy code that hasn't been migrated
+- `@MainActor` on test functions that touch `@MainActor`-isolated types
+- Arrange → Act → Assert structure; use `#expect` for assertions
+
+---
+
+## Git Workflow
+
+**Branch naming:** `feat/description`, `fix/description`, `docs/description`, `chore/description`
+**Commit format:** Conventional commits — `feat: `, `fix: `, `docs: `, `chore: `, `test: `
+**PR process:** Build + test must pass before merge: `xcodebuild -scheme Utterd -destination 'platform=macOS' build test`
+
+---
+
+## Integration Points
+
+| Service | Purpose | Auth | Docs |
+|---------|---------|------|------|
+| iCloud Voice Memos sync directory | Source of .m4a voice memo files | Disk access permission | `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` |
+| macOS Foundation Model (macOS 26+) | On-device LLM for classification/extraction | None (on-device) | Apple platform docs |
+| Remote LLM (OpenAI-compatible) | Fallback LLM provider | API key in Keychain | User-configured endpoint URL |
+| EventKit | Reminders and Calendar item creation | System permission prompt | Apple EventKit docs |
+| Scripting Bridge | Notes item creation with folder targeting | Automation permission | Apple Scripting Bridge docs |
+| System Keychain | Secure credential storage for remote LLM | Keychain Services API | Apple Security framework docs |
+| FSEvents (Foundation) | File system monitoring for new voice memos | Disk access permission | Apple FSEvents docs |
+
+---
+
+## Boundaries & Constraints
+
+### Always Do
+- Run `xcodegen generate` after modifying `project.yml` before building
+- Run build + test before creating a PR
+- Use Swift Testing (`@Test`, `#expect`) for all new tests
+- Use `@Observable` pattern for new models — never `ObservableObject`
+- Read from temporary copies of voice memo files, never the originals
+- Check the dedup store before processing and update it after successful creation
+
+### Ask First
+- Before adding third-party dependencies (the project minimizes external deps for OSS simplicity)
+- Before changing the pipeline stage order or adding/removing stages
+- Before modifying `project.yml` target structure or build settings
+- Before dropping to AppKit (NSViewRepresentable) — SwiftUI first
+- Before changing the LLM provider protocol interface
+
+### Never Do
+- Never modify or delete original voice memo files in the sync directory
+- Never store credentials in plaintext configuration files
+- Never skip the dedup store check — processing without dedup creates duplicates
+- Never process memos if the dedup store cannot be written (prevents duplicates on disk-full)
+- Never send telemetry or analytics data off the machine
+
+---
+
+## Known Gotchas
+
+- **Voice memo transcript format is undocumented**: The embedded transcript location/format within .m4a files is not publicly documented by Apple — needs investigation before implementing extraction
+- **Foundation Model availability for unsandboxed apps**: The app runs outside the App Store sandbox. Whether macOS Foundation Model framework works for unsandboxed apps is unconfirmed
+- **Notes scripting bridge limitations**: Programmatic Notes access via Scripting Bridge is less well-documented than EventKit. Folder targeting and content formatting support need investigation
+- **App is scaffolded, not yet functional**: The current codebase is a project scaffold — `UtterdApp` uses `WindowGroup` (not `MenuBarExtra` yet), models are placeholders. Pipeline stages have not been implemented
+- **macOS 15 vs macOS 26 split**: On-device LLM requires macOS 26+. On macOS 15–25, the app requires a configured remote endpoint and must surface an alert if no provider is available

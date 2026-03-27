@@ -43,8 +43,7 @@ reliable front door to their trusted systems.
 
 ## Pointers to Deeper Docs
 
-- `spec.md` — product requirements, user stories, acceptance criteria, and pipeline stages
-- `docs/architecture.md` — system architecture, quality goals, tech stack rationale, and constraints
+- `SPEC.md` — project spec: goals, architecture decisions, code conventions, testing strategy, boundaries
 - `README.md` — setup instructions and project overview
 - `project.yml` — XcodeGen project definition (targets, settings, dependencies)
 - `Libraries/Package.swift` — local SPM package definition
