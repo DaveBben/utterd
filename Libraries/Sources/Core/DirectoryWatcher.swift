@@ -2,7 +2,7 @@ import CoreServices
 import Foundation
 
 /// Errors that can occur when setting up or running the directory watcher.
-public enum DirectoryWatcherError: Error, Sendable {
+public enum DirectoryWatcherError: Error, Sendable, Equatable {
     /// The specified directory does not exist.
     case directoryNotFound(URL)
     /// The specified path exists but is not a directory.

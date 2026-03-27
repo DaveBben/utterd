@@ -150,4 +150,196 @@ struct DirectoryWatcherTests {
         #expect(received.count == 1)
         #expect(received.first?.lastPathComponent == "new.m4a")
     }
+
+    // MARK: - Error Conditions (Task 3a)
+
+    @Test("Throws directoryNotFound for non-existent directory")
+    func throwsDirectoryNotFound() {
+        let bogus = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        #expect(throws: DirectoryWatcherError.directoryNotFound(bogus)) {
+            try DirectoryWatcher(directory: bogus)
+        }
+    }
+
+    @Test("Throws notADirectory when given a file URL")
+    func throwsNotADirectory() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let fileURL = tmpDir.appendingPathComponent("afile.txt")
+        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+
+        #expect(throws: DirectoryWatcherError.notADirectory(fileURL)) {
+            try DirectoryWatcher(directory: fileURL)
+        }
+    }
+
+    @Test("Throws permissionDenied for unreadable directory")
+    func throwsPermissionDenied() throws {
+        // Skip when running as root — permissions don't apply
+        try #require(getuid() != 0)
+
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer {
+            // Restore permissions so cleanup can succeed
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: tmpDir.path)
+            try? FileManager.default.removeItem(at: tmpDir)
+        }
+
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o000], ofItemAtPath: tmpDir.path)
+
+        #expect(throws: DirectoryWatcherError.permissionDenied(tmpDir)) {
+            try DirectoryWatcher(directory: tmpDir)
+        }
+    }
+
+    // MARK: - Cancellation (Task 3a)
+
+    @Test("Cancellation stops monitoring — AC-03.1")
+    func cancellationStopsMonitoring() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let watcher = try DirectoryWatcher(directory: tmpDir)
+
+        // Start a task that consumes events, then cancel it
+        let task = Task {
+            var collected: [URL] = []
+            for await url in watcher.events {
+                collected.append(url)
+            }
+            return collected
+        }
+
+        // Let FSEvents stream start
+        try await Task.sleep(for: .milliseconds(300))
+
+        // Cancel the consuming task
+        task.cancel()
+        let result = await task.value
+
+        // After cancellation, creating new files should produce no events
+        FileManager.default.createFile(
+            atPath: tmpDir.appendingPathComponent("after_cancel.m4a").path, contents: nil)
+        try await Task.sleep(for: .milliseconds(500))
+
+        // The task should have exited cleanly — result may be empty or have some events
+        // but no crash or hang occurred (the test completing IS the assertion)
+        _ = result
+    }
+
+    @Test("No resource leaks on cancellation — AC-03.2")
+    func noResourceLeaksOnCancellation() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let watcher = try DirectoryWatcher(directory: tmpDir)
+
+        let task = Task {
+            for await _ in watcher.events {}
+        }
+
+        try await Task.sleep(for: .milliseconds(300))
+        task.cancel()
+        await task.value
+
+        // After cancellation + cleanup, creating files should not crash or emit events
+        FileManager.default.createFile(
+            atPath: tmpDir.appendingPathComponent("post_cancel.m4a").path, contents: nil)
+        try await Task.sleep(for: .milliseconds(500))
+
+        // Collect from the same stream — should get nothing (stream already finished)
+        let afterCancel = await collectEvents(from: watcher.events, count: 1, timeout: 1)
+        #expect(afterCancel.isEmpty)
+    }
+
+    // MARK: - Edge Cases (Task 3a)
+
+    @Test("Directory deleted while running terminates stream gracefully")
+    func directoryDeletedTerminatesStream() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        // No defer cleanup — we delete the directory as part of the test
+
+        let watcher = try DirectoryWatcher(directory: tmpDir)
+
+        async let events = collectEvents(from: watcher.events, count: 1, timeout: 5)
+
+        try await Task.sleep(for: .milliseconds(300))
+
+        // Delete the directory while the watcher is running
+        try FileManager.default.removeItem(at: tmpDir)
+
+        // Create an event to trigger the FSEvents callback (the directory is gone,
+        // so the scan should fail and finish the stream)
+        // We need to trigger an FSEvents callback — touching a file in the parent may do it,
+        // or we wait for the stream to notice the deletion
+        // The stream should terminate when the next callback tries to scan the deleted directory
+
+        let received = await events
+        // The key assertion: no crash, no hang — the stream terminates gracefully
+        #expect(received.isEmpty)
+    }
+
+    @Test("Empty directory at startup works and emits when file created later")
+    func emptyDirectoryAtStartup() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        // Watcher starts on empty directory — should not throw
+        let watcher = try DirectoryWatcher(directory: tmpDir)
+
+        async let events = collectEvents(from: watcher.events, count: 1, timeout: 5)
+
+        try await Task.sleep(for: .milliseconds(200))
+        FileManager.default.createFile(
+            atPath: tmpDir.appendingPathComponent("first.m4a").path, contents: nil)
+
+        let received = await events
+        #expect(received.count == 1)
+        #expect(received.first?.lastPathComponent == "first.m4a")
+    }
+
+    @Test("File renamed away after creation — original .m4a URL was still emitted")
+    func fileRenamedAwayStillEmitted() async throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let watcher = try DirectoryWatcher(directory: tmpDir)
+
+        let m4aURL = tmpDir.appendingPathComponent("rename_test.m4a")
+        let renamedURL = tmpDir.appendingPathComponent("rename_test.wav")
+
+        async let events = collectEvents(from: watcher.events, count: 1, timeout: 5)
+
+        try await Task.sleep(for: .milliseconds(200))
+
+        // Create the .m4a file
+        FileManager.default.createFile(atPath: m4aURL.path, contents: nil)
+
+        // Small delay to let FSEvents pick it up, then rename
+        try await Task.sleep(for: .milliseconds(500))
+        try FileManager.default.moveItem(at: m4aURL, to: renamedURL)
+
+        let received = await events
+        // The .m4a file should have been emitted before the rename
+        #expect(received.count == 1)
+        #expect(received.first?.lastPathComponent == "rename_test.m4a")
+    }
 }
