@@ -43,7 +43,7 @@ reliable front door to their trusted systems.
 
 ## Pointers to Deeper Docs
 
-- `SPEC.md` — project spec: goals, architecture decisions, code conventions, testing strategy, boundaries
+- `spec.md` — project spec: goals, architecture decisions, code conventions, testing strategy, boundaries
 - `README.md` — setup instructions and project overview
 - `project.yml` — XcodeGen project definition (targets, settings, dependencies)
 - `Libraries/Package.swift` — local SPM package definition
