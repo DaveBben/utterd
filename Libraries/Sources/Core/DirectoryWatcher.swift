@@ -136,6 +136,7 @@ public struct DirectoryWatcher: Sendable {
                     FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents)
                 )
             else {
+                Unmanaged<WatcherContext>.fromOpaque(contextPtr).release()
                 continuation.finish()
                 return
             }
