@@ -195,5 +195,5 @@ class BadModel: ObservableObject {
 - **Voice memo transcript format is undocumented**: The embedded transcript location/format within .m4a files is not publicly documented by Apple — needs investigation before implementing extraction
 - **Foundation Model availability for unsandboxed apps**: The app runs outside the App Store sandbox. Whether macOS Foundation Model framework works for unsandboxed apps is unconfirmed
 - **Notes scripting bridge limitations**: Programmatic Notes access via Scripting Bridge is less well-documented than EventKit. Folder targeting and content formatting support need investigation
-- **App is scaffolded, not yet functional**: The current codebase is a project scaffold — `UtterdApp` uses `WindowGroup` (not `MenuBarExtra` yet), models are placeholders. Pipeline stages have not been implemented
+- **App is partially implemented**: The voice memo file watcher (detection stage) is functional in `Libraries/Sources/Core/`. Remaining pipeline stages (transcript extraction, classification, routing, creation) and the menu bar UI (`MenuBarExtra`) have not been implemented
 - **macOS 15 vs macOS 26 split**: On-device LLM requires macOS 26+. On macOS 15–25, the app requires a configured remote endpoint and must surface an alert if no provider is available

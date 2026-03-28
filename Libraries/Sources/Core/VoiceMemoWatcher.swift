@@ -1,5 +1,10 @@
 import Foundation
 
+/// Monitors a directory for new voice memos and emits ``VoiceMemoEvent``s.
+///
+/// Catalogs existing files on startup (no events emitted for them). Handles
+/// missing or unreadable directories with exponential-backoff polling (5s–60s).
+/// Supports multiple concurrent consumers via ``events()``.
 @MainActor
 public final class VoiceMemoWatcher {
     public let directoryURL: URL
@@ -35,6 +40,9 @@ public final class VoiceMemoWatcher {
         self.clock = clock
     }
 
+    /// Begins monitoring. Returns promptly — the monitoring loop runs as a background task.
+    /// Logs a warning (missing folder) or error (no read permission) before returning.
+    /// If the folder is unavailable, polls with exponential backoff until it appears.
     public func start() async {
         // Check initial state synchronously so tests can assert on log messages
         // immediately after start() returns.
@@ -74,6 +82,8 @@ public final class VoiceMemoWatcher {
         await Task.yield()
     }
 
+    /// Stops monitoring, cancels the background task, and finishes all consumer streams.
+    /// Safe to call multiple times.
     public func stop() {
         monitorTask?.cancel()
         monitorTask = nil
@@ -84,6 +94,9 @@ public final class VoiceMemoWatcher {
         continuations.removeAll()
     }
 
+    /// Returns a new independent async stream of voice memo events. Each call
+    /// creates a separate stream — multiple consumers are supported (broadcast).
+    /// Late joiners do not receive historical events. Uses `.bufferingOldest(16)`.
     public func events() -> AsyncStream<VoiceMemoEvent> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<VoiceMemoEvent>.makeStream(
