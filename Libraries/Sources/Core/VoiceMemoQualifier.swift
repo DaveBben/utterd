@@ -1,9 +1,7 @@
 import Foundation
 
 public struct VoiceMemoQualifier: Sendable {
-    public init() {}
-
-    public func qualifies(url: URL, fileSize: Int64) -> VoiceMemoEvent? {
+    public static func qualifies(url: URL, fileSize: Int64) -> VoiceMemoEvent? {
         let filename = url.lastPathComponent
         guard !filename.hasPrefix(".") else { return nil }
         guard url.pathExtension.lowercased() == "m4a" else { return nil }
