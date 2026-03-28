@@ -36,9 +36,9 @@ public final class VoiceMemoWatcher {
     }
 
     public func start() async {
-        // Log the initial state synchronously so tests can assert on it immediately.
-        let exists = fileSystem.directoryExists(at: directoryURL)
-        if !exists {
+        // Check initial state synchronously so tests can assert on log messages
+        // immediately after start() returns.
+        if !fileSystem.directoryExists(at: directoryURL) {
             logger.warning("Watched folder is missing: \(directoryURL.path)")
         } else if !fileSystem.isReadable(at: directoryURL) {
             logger.error("Watched folder is not readable (permission denied): \(directoryURL.path)")
@@ -47,7 +47,11 @@ public final class VoiceMemoWatcher {
         // Launch the monitoring lifecycle as a background task so start() returns promptly.
         monitorTask = Task { [weak self] in
             guard let self else { return }
-            if !exists || !fileSystem.isReadable(at: directoryURL) {
+
+            // Re-check availability inside the task (state may have changed).
+            if !fileSystem.directoryExists(at: directoryURL)
+                || !fileSystem.isReadable(at: directoryURL)
+            {
                 await pollUntilAvailable()
             }
             guard !Task.isCancelled else { return }
@@ -56,6 +60,12 @@ public final class VoiceMemoWatcher {
             while !Task.isCancelled {
                 let shouldRetry = await runMonitoringLoop()
                 if !shouldRetry { break }
+
+                // Folder disappeared — clear dedup state so re-created files
+                // at the same path are detected after recovery.
+                seen.removeAll()
+                emittedPaths.removeAll()
+
                 await pollUntilAvailable()
             }
         }

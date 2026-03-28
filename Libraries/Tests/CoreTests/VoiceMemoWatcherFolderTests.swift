@@ -111,9 +111,6 @@ struct VoiceMemoWatcherFolderTests {
     }
 
     // AC-T5-3: Folder disappears mid-operation — stream ends + existsResult false → error logged.
-    // Verified via the recovery test (AC-T5-4) which confirms the full cycle:
-    // monitoring → stream ends → error logged → recovery. This test checks just the
-    // error logging portion using directoryExistsCallCount to detect the post-stream check.
     @Test("Stream completion with missing folder logs error and does not crash",
           .timeLimit(.minutes(1)))
     func streamCompletionWithMissingFolderLogsError() async {
@@ -124,6 +121,16 @@ struct VoiceMemoWatcherFolderTests {
 
         fileSystem.existsResult = true
         fileSystem.readableResult = true
+
+        // Reset call count after start() so we can track post-stream checks.
+        fileSystem.onDirectoryExistsCheck = { count in
+            // On the first post-stream check: folder is gone (existsResult = false).
+            // On subsequent poll checks: let it reappear so the loop terminates.
+            if count >= 5 {
+                fileSystem.existsResult = true
+                fileSystem.readableResult = true
+            }
+        }
 
         let watcher = VoiceMemoWatcher(
             directoryURL: directoryURL,
@@ -141,27 +148,17 @@ struct VoiceMemoWatcherFolderTests {
 
         // Simulate the folder disappearing and the FSEvents stream ending.
         fileSystem.existsResult = false
-        // After recovery check, make folder available so polling exits.
-        fileSystem.onDirectoryExistsCheck = { count in
-            if count >= 3 {
-                fileSystem.existsResult = true
-                fileSystem.readableResult = true
-            }
-        }
         monitor.completeStream()
 
-        // Wait for the monitorTask to process the stream end and enter the recovery path.
-        // The key indicator is directoryExistsCallCount increasing (the post-stream check).
+        // Wait for the error log to appear.
         let deadline = ContinuousClock.now + .seconds(5)
-        while fileSystem.directoryExistsCallCount < 3 && ContinuousClock.now < deadline {
+        while logger.errors.isEmpty && ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(10))
         }
 
         watcher.stop()
 
-        // The error should have been logged when directoryExists returned false
-        // after the stream ended.
-        #expect(!logger.errors.isEmpty, "Expected error log after folder disappeared; directoryExistsCallCount=\(fileSystem.directoryExistsCallCount)")
+        #expect(!logger.errors.isEmpty, "Expected error log after folder disappeared")
     }
 
     // AC-T5-4: After deletion + polling recovery → monitoring resumes, "monitoring started"

@@ -1,21 +1,26 @@
 import CoreServices
 import Foundation
 
-// Thread safety: all mutable state is accessed exclusively on the dedicated
-// `queue` DispatchQueue, which serializes all FSEvents callbacks and lifecycle
-// operations. @unchecked Sendable is correct here.
+// Thread safety: mutable state is protected by `queue`. The `start()` and
+// `stop()` methods dispatch state mutations onto `queue` synchronously.
+// The FSEvents callback also runs on `queue`. @unchecked Sendable is correct
+// because all mutable access is serialized on a single dispatch queue.
 public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendable {
 
     private let directoryURL: URL
     private let queue: DispatchQueue
 
     private var eventStream: FSEventStreamRef?
-    // Internal so the file-scope C callback can access it.
-    var continuation: AsyncStream<Set<URL>>.Continuation?
+    // fileprivate so the file-scope C callback can access it.
+    // Must only be accessed from `queue`.
+    fileprivate var continuation: AsyncStream<Set<URL>>.Continuation?
     private var isRunning = false
 
     // Retained-self pointer kept alive while FSEventStream is active.
-    // Balanced by Unmanaged.release() in stop().
+    // Balanced by Unmanaged.release() in stopOnQueue().
+    // Note: because passRetained prevents deallocation, deinit only fires
+    // after stop() has been called. The deinit call to stop() is a safety
+    // net for the case where start() was never called or already stopped.
     private var contextPointer: UnsafeMutableRawPointer?
 
     public init(directoryURL: URL) {
@@ -24,7 +29,7 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
     }
 
     deinit {
-        stop()
+        stopOnQueue()
     }
 
     // MARK: - DirectoryMonitor
@@ -37,17 +42,16 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
         // Stop any existing stream before starting fresh.
         stop()
 
-        let (stream, continuation) = AsyncStream<Set<URL>>.makeStream(
+        let (stream, cont) = AsyncStream<Set<URL>>.makeStream(
             bufferingPolicy: .bufferingOldest(16)
         )
-        self.continuation = continuation
 
         let pathsToWatch = [directoryURL.path] as CFArray
         var context = FSEventStreamContext()
         // passRetained keeps self alive while the stream is active.
         let retained = Unmanaged.passRetained(self)
-        contextPointer = retained.toOpaque()
-        context.info = contextPointer
+        let ptr = retained.toOpaque()
+        context.info = ptr
 
         let flags = UInt32(
             kFSEventStreamCreateFlagFileEvents |
@@ -66,13 +70,17 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
             flags
         ) else {
             retained.release()
-            contextPointer = nil
-            continuation.finish()
+            cont.finish()
             throw DirectoryMonitorError.streamCreationFailed
         }
 
-        eventStream = fsStream
-        isRunning = true
+        // Commit state on the queue so the callback can safely access it.
+        queue.sync {
+            self.continuation = cont
+            self.contextPointer = ptr
+            self.eventStream = fsStream
+            self.isRunning = true
+        }
 
         FSEventStreamSetDispatchQueue(fsStream, queue)
         FSEventStreamStart(fsStream)
@@ -81,6 +89,11 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
     }
 
     public func stop() {
+        queue.sync { stopOnQueue() }
+    }
+
+    // Must be called on `queue` (or from `deinit` where no races are possible).
+    private func stopOnQueue() {
         guard isRunning else { return }
         isRunning = false
 
@@ -110,8 +123,8 @@ public enum DirectoryMonitorError: Error {
 
 // MARK: - C callback
 
-// Must be a free function (or a C function pointer compatible closure) because
-// FSEventStreamCreate requires a C function pointer for its callback parameter.
+// Must be a free function because FSEventStreamCreate requires a C function pointer.
+// Runs on the monitor's `queue` (set via FSEventStreamSetDispatchQueue).
 private func fsEventsCallback(
     _ streamRef: ConstFSEventStreamRef,
     _ clientCallBackInfo: UnsafeMutableRawPointer?,
@@ -134,13 +147,11 @@ private func fsEventsCallback(
     }
 
     // kFSEventStreamCreateFlagUseCFTypes delivers paths as a CFArray of CFString.
+    // This unsafeBitCast is correct only when that flag is set (see flags above).
     let paths = unsafeBitCast(eventPaths, to: CFArray.self) as NSArray
     var changedURLs = Set<URL>()
     for i in 0..<numEvents {
         if let path = paths[i] as? String {
-            // Resolve symlinks so paths are canonical (e.g., /var → /private/var on macOS).
-            // This ensures callers can compare against URLs constructed via FileManager APIs
-            // without worrying about unexpanded symlink forms.
             changedURLs.insert(URL(fileURLWithPath: path).resolvingSymlinksInPath())
         }
     }
