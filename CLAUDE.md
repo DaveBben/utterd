@@ -36,7 +36,7 @@ reliable front door to their trusted systems.
 - `swift-format format -i -r Utterd/ UtterdTests/ Libraries/` — format (requires swift-format installed)
 
 ## Critical Constraints
-
+- Never run swift test while another instance is running. Wait for background processes to complete before retrying.
 - Use SwiftUI first; drop to AppKit via NSViewRepresentable only when necessary
 - Never modify or delete original voice memo files — only read from temporary copies
 - Build + test must pass before creating a PR: `xcodebuild -scheme Utterd -destination 'platform=macOS' build test`
