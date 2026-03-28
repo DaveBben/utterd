@@ -15,8 +15,8 @@ public final class VoiceMemoWatcher {
     // Tracks files for which an event has been emitted — permanently deduplicates.
     private var emittedPaths: Set<URL> = []
 
-    // Single consumer continuation — replaced each time events() is called.
-    private var eventContinuation: AsyncStream<VoiceMemoEvent>.Continuation?
+    // Continuation registry — each events() call gets its own entry.
+    private var continuations: [UUID: AsyncStream<VoiceMemoEvent>.Continuation] = [:]
 
     // The running monitor loop task — cancelled by stop().
     private var monitorTask: Task<Void, Never>?
@@ -36,66 +36,140 @@ public final class VoiceMemoWatcher {
     }
 
     public func start() async {
+        // Log the initial state synchronously so tests can assert on it immediately.
+        let exists = fileSystem.directoryExists(at: directoryURL)
+        if !exists {
+            logger.warning("Watched folder is missing: \(directoryURL.path)")
+        } else if !fileSystem.isReadable(at: directoryURL) {
+            logger.error("Watched folder is not readable (permission denied): \(directoryURL.path)")
+        }
+
+        // Launch the monitoring lifecycle as a background task so start() returns promptly.
+        monitorTask = Task { [weak self] in
+            guard let self else { return }
+            if !exists || !fileSystem.isReadable(at: directoryURL) {
+                await pollUntilAvailable()
+            }
+            guard !Task.isCancelled else { return }
+
+            // Main monitoring loop: run → detect folder loss → poll → run again.
+            while !Task.isCancelled {
+                let shouldRetry = await runMonitoringLoop()
+                if !shouldRetry { break }
+                await pollUntilAvailable()
+            }
+        }
+
+        // Yield once so the monitorTask has a chance to start.
+        await Task.yield()
+    }
+
+    public func stop() {
+        monitorTask?.cancel()
+        monitorTask = nil
+        monitor.stop()
+        for continuation in continuations.values {
+            continuation.finish()
+        }
+        continuations.removeAll()
+    }
+
+    public func events() -> AsyncStream<VoiceMemoEvent> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<VoiceMemoEvent>.makeStream(
+            bufferingPolicy: .bufferingOldest(16)
+        )
+        continuations[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.continuations.removeValue(forKey: id)
+            }
+        }
+        return stream
+    }
+
+    // MARK: - Private
+
+    /// Polls until the directory exists and is readable, using exponential backoff.
+    private func pollUntilAvailable() async {
+        var backoff = Duration.seconds(5)
+        let cap = Duration.seconds(60)
+
+        while !Task.isCancelled {
+            try? await clock.sleep(for: backoff)
+            guard !Task.isCancelled else { return }
+
+            let nowExists = fileSystem.directoryExists(at: directoryURL)
+            if nowExists && fileSystem.isReadable(at: directoryURL) {
+                return
+            }
+
+            backoff = min(backoff * 2, cap)
+        }
+    }
+
+    /// Catalogs existing files, starts the monitor, and processes events.
+    /// Returns `true` if the folder disappeared and the caller should retry,
+    /// `false` if monitoring ended normally (stop() was called).
+    private func runMonitoringLoop() async -> Bool {
+        guard !Task.isCancelled else { return false }
+
         // Catalog existing files — suppress events for files already present.
         for url in fileSystem.contentsOfDirectory(at: directoryURL) {
             let size = fileSystem.fileSize(at: url)
             if let size, let _ = VoiceMemoQualifier.qualifies(url: url, fileSize: size) {
-                // Already qualifies — mark as emitted so it is never re-emitted.
                 emittedPaths.insert(url)
                 seen[url] = size
             } else {
-                // Not yet qualifying — store nil so it can be re-evaluated on growth.
                 seen[url] = nil
             }
         }
 
-        guard let eventStream = try? monitor.start() else { return }
+        guard let eventStream = try? monitor.start() else { return false }
 
-        monitorTask = Task { [weak self] in
-            guard let self else { return }
-            for await changedURLs in eventStream {
-                self.handle(changedURLs: changedURLs)
-            }
+        logger.info("monitoring started")
+
+        for await changedURLs in eventStream {
+            guard !Task.isCancelled else { break }
+            handle(changedURLs: changedURLs)
         }
-    }
 
-    public func stop() {
+        guard !Task.isCancelled else { return false }
+
+        // Stream ended — check whether the directory disappeared.
         monitor.stop()
-        monitorTask?.cancel()
-        monitorTask = nil
-        eventContinuation?.finish()
-        eventContinuation = nil
-    }
-
-    public func events() -> AsyncStream<VoiceMemoEvent> {
-        let (stream, continuation) = AsyncStream<VoiceMemoEvent>.makeStream(
-            bufferingPolicy: .bufferingOldest(16)
-        )
-        eventContinuation = continuation
-        return stream
+        let stillExists = fileSystem.directoryExists(at: directoryURL)
+        if !stillExists {
+            logger.error("Watched folder disappeared: \(directoryURL.path)")
+            return true // caller should retry after waiting
+        }
+        return false
     }
 
     private func handle(changedURLs: Set<URL>) {
         for url in changedURLs {
             guard let size = fileSystem.fileSize(at: url) else {
-                // File deleted or inaccessible — skip silently.
                 continue
             }
 
             guard !emittedPaths.contains(url) else {
-                // Already emitted for this path — deduplicate.
                 continue
             }
 
             if let event = VoiceMemoQualifier.qualifies(url: url, fileSize: size) {
                 emittedPaths.insert(url)
                 seen[url] = size
-                eventContinuation?.yield(event)
+                broadcast(event)
                 logger.info("Detected \(url.lastPathComponent) (\(size) bytes)")
             } else {
-                // Not yet qualifying — track with nil so it can be re-evaluated.
                 seen[url] = nil
             }
+        }
+    }
+
+    private func broadcast(_ event: VoiceMemoEvent) {
+        for continuation in continuations.values {
+            continuation.yield(event)
         }
     }
 }
