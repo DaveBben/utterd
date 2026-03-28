@@ -13,10 +13,6 @@ public final class VoiceMemoWatcher {
     let logger: any WatcherLogger
     let clock: any Clock<Duration>
 
-    // Maps each known file URL to its last-evaluated size.
-    // nil = cataloged but not yet qualified/emitted.
-    private var seen: [URL: Int64?] = [:]
-
     // Tracks files for which an event has been emitted — permanently deduplicates.
     private var emittedPaths: Set<URL> = []
 
@@ -71,7 +67,6 @@ public final class VoiceMemoWatcher {
 
                 // Folder disappeared — clear dedup state so re-created files
                 // at the same path are detected after recovery.
-                seen.removeAll()
                 emittedPaths.removeAll()
 
                 await pollUntilAvailable()
@@ -140,15 +135,18 @@ public final class VoiceMemoWatcher {
         // Catalog existing files — suppress events for files already present.
         for url in fileSystem.contentsOfDirectory(at: directoryURL) {
             let size = fileSystem.fileSize(at: url)
-            if let size, let _ = VoiceMemoQualifier.qualifies(url: url, fileSize: size) {
+            if let size, VoiceMemoQualifier.qualifies(url: url, fileSize: size) != nil {
                 emittedPaths.insert(url)
-                seen[url] = size
-            } else {
-                seen[url] = nil
             }
         }
 
-        guard let eventStream = try? monitor.start() else { return false }
+        let eventStream: AsyncStream<Set<URL>>
+        do {
+            eventStream = try monitor.start()
+        } catch {
+            logger.error("Failed to start directory monitor: \(error)")
+            return false
+        }
 
         logger.info("monitoring started")
 
@@ -181,11 +179,8 @@ public final class VoiceMemoWatcher {
 
             if let event = VoiceMemoQualifier.qualifies(url: url, fileSize: size) {
                 emittedPaths.insert(url)
-                seen[url] = size
                 broadcast(event)
                 logger.info("Detected \(url.lastPathComponent) (\(size) bytes)")
-            } else {
-                seen[url] = nil
             }
         }
     }
