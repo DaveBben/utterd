@@ -19,6 +19,10 @@ final class PermissionChecker {
     }
 
     func checkAccess() {
+        // Attempt a directory listing to trigger TCC registration. This ensures Utterd
+        // appears in System Settings > Full Disk Access so the user can find and enable it.
+        // isReadableFile alone does not trigger TCC registration on macOS.
+        _ = fileSystem.contentsOfDirectory(at: voiceMemoDirectoryURL)
         hasVoiceMemoAccess = fileSystem.isReadable(at: voiceMemoDirectoryURL)
     }
 }
