@@ -160,7 +160,7 @@ class BadModel: ObservableObject {
 | EventKit | Reminders and Calendar item creation | System permission prompt | Apple EventKit docs |
 | Scripting Bridge | Notes item creation with folder targeting | Automation permission | Apple Scripting Bridge docs |
 | System Keychain | Secure credential storage for remote LLM | Keychain Services API | Apple Security framework docs |
-| FSEvents (Foundation) | File system monitoring for new voice memos | Disk access permission | Apple FSEvents docs |
+| FSEvents (CoreServices) | File system monitoring for new voice memos | Disk access permission | Apple FSEvents docs |
 
 ---
 

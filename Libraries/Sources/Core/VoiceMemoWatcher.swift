@@ -8,10 +8,10 @@ import Foundation
 @MainActor
 public final class VoiceMemoWatcher {
     public let directoryURL: URL
-    let monitor: any DirectoryMonitor
-    let fileSystem: any FileSystemChecker
-    let logger: any WatcherLogger
-    let clock: any Clock<Duration>
+    private let monitor: any DirectoryMonitor
+    private let fileSystem: any FileSystemChecker
+    private let logger: any WatcherLogger
+    private let clock: any Clock<Duration>
 
     // Tracks files for which an event has been emitted — permanently deduplicates.
     private var emittedPaths: Set<URL> = []
@@ -40,6 +40,11 @@ public final class VoiceMemoWatcher {
     /// Logs a warning (missing folder) or error (no read permission) before returning.
     /// If the folder is unavailable, polls with exponential backoff until it appears.
     public func start() async {
+        // Cancel any existing monitoring task to prevent orphaned loops.
+        if monitorTask != nil {
+            stop()
+        }
+
         // Check initial state synchronously so tests can assert on log messages
         // immediately after start() returns.
         if !fileSystem.directoryExists(at: directoryURL) {
@@ -148,7 +153,7 @@ public final class VoiceMemoWatcher {
             return false
         }
 
-        logger.info("monitoring started")
+        logger.info("Monitoring started")
 
         for await changedURLs in eventStream {
             guard !Task.isCancelled else { break }

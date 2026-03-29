@@ -46,7 +46,7 @@ struct VoiceMemoWatcherFolderTests {
         watcher.stop()
     }
 
-    // AC-T5-2: Polling for missing folder — folder appears after 2nd check → "monitoring started"
+    // AC-T5-2: Polling for missing folder — folder appears after 2nd check → "Monitoring started"
     // logged and a subsequent file event is delivered to the consumer.
     @Test("Polling loop recovers: folder appears after 2nd check, monitoring starts, event delivered")
     func pollingLoopRecoversWhenFolderAppears() async {
@@ -94,7 +94,7 @@ struct VoiceMemoWatcherFolderTests {
             await Task.yield()
         }
 
-        let hasMonitoringStarted = logger.infos.contains { $0.contains("monitoring started") }
+        let hasMonitoringStarted = logger.infos.contains { $0.contains("Monitoring started") }
         #expect(hasMonitoringStarted)
 
         // Verify the monitoring pipeline is operational.
@@ -161,7 +161,7 @@ struct VoiceMemoWatcherFolderTests {
         #expect(!logger.errors.isEmpty, "Expected error log after folder disappeared")
     }
 
-    // AC-T5-4: After deletion + polling recovery → monitoring resumes, "monitoring started"
+    // AC-T5-4: After deletion + polling recovery → monitoring resumes, "Monitoring started"
     // re-logged, and a file event is delivered.
     @Test("Monitoring resumes after folder deletion and reappearance")
     func monitoringResumesAfterFolderDeletionAndReappearance() async {
@@ -197,8 +197,8 @@ struct VoiceMemoWatcherFolderTests {
             await Task.yield()
         }
 
-        // First "monitoring started" should appear after normal startup.
-        let firstStartCount = logger.infos.filter { $0.contains("monitoring started") }.count
+        // First "Monitoring started" should appear after normal startup.
+        let firstStartCount = logger.infos.filter { $0.contains("Monitoring started") }.count
         #expect(firstStartCount >= 1)
 
         // Simulate folder disappearing and stream ending.
@@ -216,7 +216,7 @@ struct VoiceMemoWatcherFolderTests {
         monitor.completeStream()
 
         // Yield to let the recovery flow execute: detect disappearance, log error,
-        // re-enter polling, poll twice, reappear, log "monitoring started" again.
+        // re-enter polling, poll twice, reappear, log "Monitoring started" again.
         for _ in 0..<30 {
             await Task.yield()
         }
@@ -224,7 +224,7 @@ struct VoiceMemoWatcherFolderTests {
         let errorLogged = !logger.errors.isEmpty
         #expect(errorLogged)
 
-        let totalMonitorStartCount = logger.infos.filter { $0.contains("monitoring started") }.count
+        let totalMonitorStartCount = logger.infos.filter { $0.contains("Monitoring started") }.count
         #expect(totalMonitorStartCount >= 2)
 
         // Inject a file event after recovery to confirm the pipeline is live.
@@ -283,7 +283,7 @@ struct VoiceMemoWatcherFolderTests {
         await collectTask.value
     }
 
-    // AC-T5-6: Permission error resolves after 2nd check → "monitoring started" logged.
+    // AC-T5-6: Permission error resolves after 2nd check → "Monitoring started" logged.
     @Test("Monitoring starts after permission is granted on 2nd poll")
     func monitoringStartsAfterPermissionGranted() async {
         let monitor = MockDirectoryMonitor()
@@ -317,7 +317,7 @@ struct VoiceMemoWatcherFolderTests {
             await Task.yield()
         }
 
-        let hasMonitoringStarted = logger.infos.contains { $0.contains("monitoring started") }
+        let hasMonitoringStarted = logger.infos.contains { $0.contains("Monitoring started") }
         #expect(hasMonitoringStarted)
 
         watcher.stop()

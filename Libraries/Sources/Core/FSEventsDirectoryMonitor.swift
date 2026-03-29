@@ -7,6 +7,11 @@ import Foundation
 // because all mutable access is serialized on a single dispatch queue.
 public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendable {
 
+    // FSEvents coalesces filesystem events within this window before delivery.
+    // 0.3s balances responsiveness (well within the 5s detection target, SC-5)
+    // with batching to avoid excessive callback invocations during burst iCloud syncs.
+    private static let eventLatency: CFTimeInterval = 0.3
+
     private let directoryURL: URL
     private let queue: DispatchQueue
 
@@ -18,9 +23,10 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
 
     // Retained-self pointer kept alive while FSEventStream is active.
     // Balanced by Unmanaged.release() in stopOnQueue().
-    // Note: because passRetained prevents deallocation, deinit only fires
-    // after stop() has been called. The deinit call to stop() is a safety
-    // net for the case where start() was never called or already stopped.
+    // IMPORTANT: callers MUST call stop() before dropping all references.
+    // passRetained prevents deallocation while the stream is active, so
+    // deinit only fires after stop() has already been called (making the
+    // deinit call to stopOnQueue() a no-op safety net).
     private var contextPointer: UnsafeMutableRawPointer?
 
     public init(directoryURL: URL) {
@@ -29,6 +35,9 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
     }
 
     deinit {
+        // Safety net — stopOnQueue() is a no-op if stop() was already called
+        // (which it must have been for deinit to fire, since passRetained
+        // prevents deallocation while the stream is active).
         stopOnQueue()
     }
 
@@ -66,7 +75,7 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
             &context,
             pathsToWatch,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-            0.3,
+            Self.eventLatency,
             flags
         ) else {
             retained.release()
@@ -74,16 +83,17 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
             throw DirectoryMonitorError.streamCreationFailed
         }
 
-        // Commit state on the queue so the callback can safely access it.
+        // Commit state and activate the stream atomically on the queue.
+        // Both must happen inside the same queue.sync to prevent a concurrent
+        // stop() from releasing the stream between state commit and activation.
         queue.sync {
             self.continuation = cont
             self.contextPointer = ptr
             self.eventStream = fsStream
             self.isRunning = true
+            FSEventStreamSetDispatchQueue(fsStream, queue)
+            FSEventStreamStart(fsStream)
         }
-
-        FSEventStreamSetDispatchQueue(fsStream, queue)
-        FSEventStreamStart(fsStream)
 
         return stream
     }
@@ -116,8 +126,13 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
 
 // MARK: - Error
 
+/// Errors thrown by ``FSEventsDirectoryMonitor/start()``.
 public enum DirectoryMonitorError: Error {
+    /// The monitored directory does not exist at the given URL.
     case directoryNotFound(URL)
+    /// `FSEventStreamCreate` returned nil — typically indicates a system resource
+    /// issue (e.g., too many open event streams). This is rare and generally not
+    /// recoverable without releasing other streams first.
     case streamCreationFailed
 }
 
