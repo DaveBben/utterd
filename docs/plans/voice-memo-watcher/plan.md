@@ -11,4 +11,4 @@
 
 - SC-4 (memory footprint ≤ 10% after 100 events) deferred — requires profiling tooling; seen-set grows ~80 bytes/entry, negligible at expected volume
 - SC-5 (detection latency < 5s) verified via FSEvents integration test but not under production iCloud sync conditions
-- Sandbox/entitlements work needed before the watcher can access the real Voice Memos group container
+- ~~Sandbox/entitlements work needed before the watcher can access the real Voice Memos group container~~ Resolved by `permissions` branch (Full Disk Access gate, sandbox removed)
