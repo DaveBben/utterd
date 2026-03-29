@@ -179,14 +179,14 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write a failing test in `UtterdTests/RealFileSystemCheckerTests.swift` that verifies `RealFileSystemChecker` conforms to `FileSystemChecker` and that `isReadable(at:)` returns `true` for a known-readable path (e.g., `FileManager.default.temporaryDirectory`) and `false` for a nonexistent path (use a UUID-based path like `/tmp/\(UUID().uuidString)` to avoid accidental collisions)
-2. [ ] Run tests to verify they fail (confirm RED state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
-3. [ ] Create `Utterd/Core/RealFileSystemChecker.swift` with `import Core` and `import Foundation`. Define `struct RealFileSystemChecker: FileSystemChecker` implementing all four protocol methods:
+1. [x] Write a failing test in `UtterdTests/RealFileSystemCheckerTests.swift` that verifies `RealFileSystemChecker` conforms to `FileSystemChecker` and that `isReadable(at:)` returns `true` for a known-readable path (e.g., `FileManager.default.temporaryDirectory`) and `false` for a nonexistent path (use a UUID-based path like `/tmp/\(UUID().uuidString)` to avoid accidental collisions)
+2. [x] Run tests to verify they fail (confirm RED state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
+3. [x] Create `Utterd/Core/RealFileSystemChecker.swift` with `import Core` and `import Foundation`. Define `struct RealFileSystemChecker: FileSystemChecker` implementing all four protocol methods:
    - `isReadable(at:)` → `FileManager.default.isReadableFile(atPath: url.path)`
    - `directoryExists(at:)` → `FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)` checking `isDir`
    - `contentsOfDirectory(at:)` → `(try? FileManager.default.contentsOfDirectory(at: url, ...)) ?? []`
    - `fileSize(at:)` → `(try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64)`
-4. [ ] Run tests to verify they pass (confirm GREEN state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
+4. [x] Run tests to verify they pass (confirm GREEN state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
 
 **Acceptance Criteria:**
 
