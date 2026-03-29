@@ -36,7 +36,13 @@ reliable front door to their trusted systems.
 - `swift-format format -i -r Utterd/ UtterdTests/ Libraries/` — format (requires swift-format installed)
 
 ## Critical Constraints
-
+- Never run swift test while another instance is running. Wait for background processes to complete before retrying.
+- Never run `swift build` or `swift test` in background or in parallel — SwiftPM holds an exclusive lock on `.build/`.
+- When running Swift tests (especially from subagents), prevent hangs from watch/interactive mode:
+  - Always redirect stdin: `swift test </dev/null` — this is the primary fix. It cuts off stdin entirely, signaling unambiguously that this is a non-interactive run.
+  - Pipe output as a secondary signal: `swift test </dev/null 2>&1`
+  - Always wrap with a timeout: `timeout 120 swift test </dev/null`
+  - Subagent prompts must explicitly instruct non-interactive flags when running tests.
 - Use SwiftUI first; drop to AppKit via NSViewRepresentable only when necessary
 - Never modify or delete original voice memo files — only read from temporary copies
 - Build + test must pass before creating a PR: `xcodebuild -scheme Utterd -destination 'platform=macOS' build test`

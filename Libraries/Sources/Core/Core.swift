@@ -1,7 +1,8 @@
-/// Shared core module for Utterd.
+/// Core module for Utterd.
 ///
-/// Add networking clients, persistence services, and shared domain types here.
-/// This module is imported by the main app target and can be tested independently.
+/// Contains the voice memo file watcher, directory monitoring infrastructure,
+/// event types, and shared domain logic. Imported by the main app target and
+/// testable independently via `cd Libraries && swift test`.
 
 public enum Core {
     public static let version = "1.0.0"

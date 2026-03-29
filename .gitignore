@@ -39,3 +39,6 @@ Icon
 *.playground/
 *.swp
 *~
+
+# project
+.claude/
