@@ -100,9 +100,9 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Remove the `com.apple.security.app-sandbox` key and its `<true/>` value from `Utterd.entitlements`
-2. [ ] Keep `com.apple.security.network.client` intact
-3. [ ] Regenerate and build: `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' build`
+1. [x] Remove the `com.apple.security.app-sandbox` key and its `<true/>` value from `Utterd.entitlements`
+2. [x] Keep `com.apple.security.network.client` intact
+3. [x] Regenerate and build: `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' build`
 
 **Acceptance Criteria:**
 
