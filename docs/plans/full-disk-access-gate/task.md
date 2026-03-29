@@ -134,20 +134,20 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing tests in `PermissionCheckerTests.swift` (add `import Core` and `@testable import Utterd` at the top):
+1. [x] Write failing tests in `PermissionCheckerTests.swift` (add `import Core` and `@testable import Utterd` at the top):
    - Test 1 (AC-04.1): Create mock with `readableResult = true`, init `PermissionChecker` with it, call `checkAccess()`, assert `hasVoiceMemoAccess == true`
    - Test 2 (AC-04.2 + E1 + E2): Create mock with `readableResult = false`, init `PermissionChecker` with it, call `checkAccess()`, assert `hasVoiceMemoAccess == false`. Add a comment noting this covers both E1 (directory doesn't exist) and E2 (not readable for other reasons) because `isReadable` returns `false` in both cases
    - Test 3 (AC-04.3): Assert that `permissionChecker.voiceMemoDirectoryURL.path` ends with `Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` — this tests path construction as a pure output without needing a recording mock. Additionally, create a recording mock, call `checkAccess()`, and assert `isReadableCalledWith` contains the `voiceMemoDirectoryURL` — confirming `checkAccess()` actually uses the correct URL
-2. [ ] Create `UtterdTests/Mocks/MockFileSystemChecker.swift` with `import Core` at the top. Build a recording mock conforming to `FileSystemChecker` that:
+2. [x] Create `UtterdTests/Mocks/MockFileSystemChecker.swift` with `import Core` at the top. Build a recording mock conforming to `FileSystemChecker` that:
    - Has `readableResult: Bool` (configurable return value)
    - Has `isReadableCalledWith: [URL]` array that records every URL passed to `isReadable(at:)`
    - Implements `directoryExists`, `contentsOfDirectory`, `fileSize` with sensible defaults (return `true`, `[]`, `nil` respectively)
    - Follows the `@unchecked Sendable` + `nonisolated(unsafe)` pattern from the Libraries mock
    - Add a comment: `// NOTE: Parallels Libraries/Tests/CoreTests/Mocks/MockFileSystemChecker.swift. If FileSystemChecker gains new methods, both mocks must be updated.`
-3. [ ] Run tests to verify they fail (confirm RED state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
-4. [ ] Implement `checkAccess()` in `PermissionChecker.swift`: call `fileSystem.isReadable(at: voiceMemoDirectoryURL)` and assign the result to `hasVoiceMemoAccess`
-5. [ ] Verify `voiceMemoDirectoryURL` uses `FileManager.default.homeDirectoryForCurrentUser` to expand the path (not a hardcoded `/Users/<name>/` prefix) — satisfying E5
-6. [ ] Run tests to verify they pass (confirm GREEN state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
+3. [x] Run tests to verify they fail (confirm RED state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
+4. [x] Implement `checkAccess()` in `PermissionChecker.swift`: call `fileSystem.isReadable(at: voiceMemoDirectoryURL)` and assign the result to `hasVoiceMemoAccess`
+5. [x] Verify `voiceMemoDirectoryURL` uses `FileManager.default.homeDirectoryForCurrentUser` to expand the path (not a hardcoded `/Users/<name>/` prefix) — satisfying E5
+6. [x] Run tests to verify they pass (confirm GREEN state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
 
 **Acceptance Criteria:**
 
