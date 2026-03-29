@@ -2,7 +2,7 @@
 
 **Status**: Approved
 **Created**: 2026-03-28
-**Branch**: `feat/full-disk-access-gate`
+**Branch**: `permissions`
 
 ---
 

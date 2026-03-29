@@ -9,6 +9,10 @@ A macOS daemon that routes voice memos to Reminders, Calendar, and Notes
 - Swift 6.2
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
+## Prerequisites
+
+Utterd requires **Full Disk Access** to read voice memos from iCloud. On first launch, the app will prompt you to grant access in System Settings > Privacy & Security > Full Disk Access. Grant access and relaunch the app.
+
 ## Getting Started
 
 ```bash

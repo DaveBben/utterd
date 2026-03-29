@@ -24,7 +24,7 @@ func handleOpenSystemSettings(
 }
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var permissionChecker = PermissionChecker(fileSystem: RealFileSystemChecker())
 
     func applicationDidFinishLaunching(_ notification: Notification) {

@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- **App Sandbox vs Voice Memos Access**: The current entitlements (`Utterd/Resources/Utterd.entitlements`) enable `com.apple.security.app-sandbox` with only network-client permission. A sandboxed app cannot access `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` — this is Apple's group container and is not joinable by third-party apps. Before the watcher can be validated against the real directory, the sandbox must be disabled (appropriate for a non-App-Store single-user daemon) or user-granted folder access via security-scoped bookmarks must be implemented. **This is not a task in this plan** — it is a separate entitlements/permissions concern. All tasks here use temporary directories for testing and are valid regardless of the sandbox decision.
+- **App Sandbox vs Voice Memos Access**: ~~The current entitlements enable `com.apple.security.app-sandbox` with only network-client permission. A sandboxed app cannot access `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings`.~~ **Resolved:** The `permissions` branch disabled the app sandbox and added a Full Disk Access permission gate at launch. The watcher can now access the real Voice Memos group container when Full Disk Access is granted.
 
 ---
 
