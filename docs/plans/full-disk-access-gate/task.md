@@ -220,17 +220,17 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing tests in `UtterdTests/PermissionGateTests.swift` (add `import Core` and `@testable import Utterd`). The tests target two free functions that will be defined in `AppDelegate.swift`:
+1. [x] Write failing tests in `UtterdTests/PermissionGateTests.swift` (add `import Core` and `@testable import Utterd`). The tests target two free functions that will be defined in `AppDelegate.swift`:
    - Define an enum `PermissionGateAction { case proceed, showPermissionAlert }` in `AppDelegate.swift` (or a separate file). Define a function `evaluatePermissionGate(checker: PermissionChecker) -> PermissionGateAction` that calls `checker.checkAccess()` and returns `.showPermissionAlert` if `hasVoiceMemoAccess` is `false`, `.proceed` otherwise. Define a function `handleOpenSystemSettings(openURL: (URL) -> Bool = { NSWorkspace.shared.open($0) }, terminate: () -> Void = { NSApplication.shared.terminate(nil) })` that attempts to open the Full Disk Access URL and always calls `terminate` regardless of the `openURL` result.
    - Test 1: Given a mock where `isReadable` returns `false`, when `evaluatePermissionGate(checker:)` is called, then the result is `.showPermissionAlert`
    - Test 2: Given a mock where `isReadable` returns `true`, when `evaluatePermissionGate(checker:)` is called, then the result is `.proceed`
    - Test 3 (E3): Given an `openURL` closure that returns `false` (simulating scheme failure) and a recording `terminate` closure, when `handleOpenSystemSettings(openURL:terminate:)` is called, then `terminate` was called exactly once
-2. [ ] Run tests to verify they fail (confirm RED state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
-3. [ ] Create `Utterd/App/AppDelegate.swift` containing:
+2. [x] Run tests to verify they fail (confirm RED state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
+3. [x] Create `Utterd/App/AppDelegate.swift` containing:
    - The `PermissionGateAction` enum and the two testable functions described in Step 1
    - An `AppDelegate: NSObject, NSApplicationDelegate` class that creates its own `PermissionChecker(fileSystem: RealFileSystemChecker())` internally (the delegate is instantiated by `@NSApplicationDelegateAdaptor`, so constructor injection from `UtterdApp` is not possible)
    - In `applicationDidFinishLaunching(_:)`: guard against XCTest (`ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil` → return early; add comment: "Works with xcodebuild. Does not detect swift test CLI."). Then call `evaluatePermissionGate(checker:)` and, if `.showPermissionAlert`, call `showPermissionAlert()`
-4. [ ] Implement `showPermissionAlert()` as a private method on `AppDelegate`:
+4. [x] Implement `showPermissionAlert()` as a private method on `AppDelegate`:
    - Create `NSAlert()` with `alertStyle = .warning`
    - Set `messageText = "Full Disk Access Required"`
    - Set `informativeText` explaining that Utterd needs to read voice memos from iCloud, and the user must grant Full Disk Access in System Settings then relaunch
@@ -238,8 +238,8 @@ None — all decisions resolved during planning.
    - Add button 2: `addButton(withTitle: "Quit")` — set `keyEquivalent = "\u{1b}"` (Escape) so pressing Escape triggers Quit, eliminating the system beep
    - Call `runModal()` synchronously
    - After `runModal()` returns: if response is `.alertFirstButtonReturn`, call `handleOpenSystemSettings()` (which opens the URL and terminates). For any other response (Quit/Escape), call `NSApplication.shared.terminate(nil)` directly
-5. [ ] In `UtterdApp.swift`: add only `@NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate` — no other changes needed since `AppDelegate` owns its own `PermissionChecker`
-6. [ ] Run tests to verify they pass (confirm GREEN state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
+5. [x] In `UtterdApp.swift`: add only `@NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate` — no other changes needed since `AppDelegate` owns its own `PermissionChecker`
+6. [x] Run tests to verify they pass (confirm GREEN state): `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' test`
 
 **Acceptance Criteria:**
 
