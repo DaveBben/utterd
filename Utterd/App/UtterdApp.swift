@@ -6,6 +6,9 @@ struct UtterdApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
+        // Wire appState to the delegate so applicationDidFinishLaunching can set permissionResolved.
+        // Uses an inline closure because @State and @NSApplicationDelegateAdaptor are both SwiftUI-managed.
+        // Runs during body evaluation, before the delegate lifecycle method fires.
         let _ = { appDelegate.appState = appState }()
 
         MenuBarExtra("Utterd", systemImage: "waveform", isInserted: Binding(

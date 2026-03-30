@@ -29,7 +29,7 @@ Users have no persistent, low-interruption indicator that the voice memo triage 
 - "Quit Utterd" menu item that terminates the app immediately (no confirmation dialog)
 - App runs without any main window (menu-bar-only)
 - App does not appear in the Dock while running
-- Existing Settings scene (Cmd+,) continues to function (regression preservation)
+- ~~Existing Settings scene (Cmd+,) continues to function (regression preservation)~~ — known regression: LSUIElement removes the app menu bar, breaking Cmd+, shortcut binding. Deferred.
 
 ### Out (explicitly)
 - Real voice memo watcher integration for sync status — deferred to a future plan
@@ -81,7 +81,7 @@ So that the UI is ready for future configuration even though it does nothing yet
 **Acceptance Criteria**
 - [ ] AC-04.1: GIVEN the popover is open, WHEN the user views the action items, THEN a clickable "Settings..." item appears between the divider and the "Quit Utterd" item
 - [ ] AC-04.2: GIVEN the popover is open, WHEN the user clicks "Settings...", THEN the click is accepted with no visible effect (no window opens, no alert appears, no error is logged)
-- [ ] AC-04.3 (regression check): GIVEN the app is running as a menu-bar-only app, WHEN the user presses Cmd+, THEN the existing Settings window opens and functions correctly — this is not new functionality but must survive the migration
+- [ ] AC-04.3 (known regression): ~~GIVEN the app is running as a menu-bar-only app, WHEN the user presses Cmd+, THEN the existing Settings window opens~~ — LSUIElement removes the app menu bar, breaking Cmd+, shortcut binding. Deferred to future plan. See task.md Key Decisions.
 
 ---
 

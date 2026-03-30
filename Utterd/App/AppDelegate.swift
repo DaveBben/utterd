@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        assert(appState != nil, "appState must be wired by UtterdApp.body before applicationDidFinishLaunching")
+
         // SwiftUI evaluates App.body (including MenuBarExtra scenes) BEFORE
         // applicationDidFinishLaunching fires. The MenuBarExtra is conditionally
         // included only when permissionResolved is true, preventing a "ghost icon"
