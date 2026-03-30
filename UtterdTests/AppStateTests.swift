@@ -13,4 +13,12 @@ struct AppStateTests {
 
         #expect(state.errorMessage == nil)
     }
+
+    @Test("permissionResolved defaults to false")
+    @MainActor
+    func permissionResolvedDefault() {
+        let state = AppState()
+
+        #expect(state.permissionResolved == false)
+    }
 }

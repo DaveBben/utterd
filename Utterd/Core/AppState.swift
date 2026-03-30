@@ -6,6 +6,7 @@ import Observation
 final class AppState {
     var isLoading = false
     var errorMessage: String?
+    var permissionResolved = false
 
     func clearError() {
         errorMessage = nil

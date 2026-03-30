@@ -6,13 +6,16 @@ struct UtterdApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .environment(appState)
-        }
-        .defaultSize(width: 800, height: 600)
-        .commands {
-            AppCommands()
+        // Wire appState to the delegate so applicationDidFinishLaunching can set permissionResolved.
+        // Uses an inline closure because @State and @NSApplicationDelegateAdaptor are both SwiftUI-managed.
+        // Runs during body evaluation, before the delegate lifecycle method fires.
+        let _ = { appDelegate.appState = appState }()
+
+        MenuBarExtra("Utterd", systemImage: "waveform", isInserted: Binding(
+            get: { appState.permissionResolved },
+            set: { appState.permissionResolved = $0 }
+        )) {
+            MenuBarMenuContent()
         }
 
         Settings {
