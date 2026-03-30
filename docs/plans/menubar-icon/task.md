@@ -2,7 +2,7 @@
 
 **Plan**: [plan.md](plan.md)
 **Date**: 2026-03-30
-**Status**: Approved
+**Status**: In Progress
 
 ---
 
@@ -63,11 +63,11 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing tests in `UtterdTests/MenuBarStringsTests.swift` using `@Suite("MenuBarStrings")` and `@Test`: (a) `#expect(MenuBarStrings.title == "Last Voice Memo Synced")`, (b) `#expect(MenuBarStrings.subtitle == "Yesterday, 1:25 AM")`, (c) `#expect(MenuBarStrings.settingsButton == "Settings...")`, (d) `#expect(MenuBarStrings.quitButton == "Quit Utterd")`
-2. [ ] Run tests to verify they fail (confirm RED state — `MenuBarStrings` type does not yet exist)
-3. [ ] Create `Utterd/Features/MenuBar/MenuBarStrings.swift` with an enum `MenuBarStrings` containing static let constants for the four user-facing popover strings: `title`, `subtitle`, `settingsButton`, `quitButton`
-4. [ ] Add `var permissionResolved = false` property to `AppState` in `Utterd/Core/AppState.swift` — this flag will be used by Task 2 to conditionally show the `MenuBarExtra` scene
-5. [ ] Run tests to verify they pass (confirm GREEN state); then run `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' build` to verify compilation
+1. [x] Write failing tests in `UtterdTests/MenuBarStringsTests.swift` using `@Suite("MenuBarStrings")` and `@Test`: (a) `#expect(MenuBarStrings.title == "Last Voice Memo Synced")`, (b) `#expect(MenuBarStrings.subtitle == "Yesterday, 1:25 AM")`, (c) `#expect(MenuBarStrings.settingsButton == "Settings...")`, (d) `#expect(MenuBarStrings.quitButton == "Quit Utterd")`
+2. [x] Run tests to verify they fail (confirm RED state — `MenuBarStrings` type does not yet exist)
+3. [x] Create `Utterd/Features/MenuBar/MenuBarStrings.swift` with an enum `MenuBarStrings` containing static let constants for the four user-facing popover strings: `title`, `subtitle`, `settingsButton`, `quitButton`
+4. [x] Add `var permissionResolved = false` property to `AppState` in `Utterd/Core/AppState.swift` — this flag will be used by Task 2 to conditionally show the `MenuBarExtra` scene
+5. [x] Run tests to verify they pass (confirm GREEN state); then run `xcodegen generate && xcodebuild -scheme Utterd -destination 'platform=macOS' build` to verify compilation
 
 **Acceptance Criteria:**
 
