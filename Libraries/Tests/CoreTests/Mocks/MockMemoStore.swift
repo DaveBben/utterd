@@ -25,4 +25,12 @@ actor MockMemoStore: MemoStore {
     func markProcessed(fileURL: URL, date: Date) async throws {
         markProcessedCalls.append((fileURL: fileURL, date: date))
     }
+
+    func setInsertError(_ error: Error?) {
+        self.insertError = error
+    }
+
+    func setOldestUnprocessed(_ record: MemoRecord?) {
+        self.oldestUnprocessedResult = record
+    }
 }

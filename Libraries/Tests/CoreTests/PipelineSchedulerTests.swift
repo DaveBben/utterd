@@ -347,34 +347,3 @@ struct PipelineSchedulerTests {
     }
 }
 
-// MARK: - MockMemoStore convenience for scheduler tests
-
-extension MockMemoStore {
-    func setOldestUnprocessed(_ record: MemoRecord?) {
-        self.oldestUnprocessedResult = record
-    }
-}
-
-// MARK: - Thread-safe helper for test state
-
-private actor ActorBox<T: Sendable> {
-    private var value: T
-
-    init(_ initial: T) {
-        value = initial
-    }
-
-    func get() -> T { value }
-
-    func set(_ newValue: T) {
-        value = newValue
-    }
-}
-
-extension ActorBox where T == Int {
-    @discardableResult
-    func increment() -> Int {
-        value += 1
-        return value
-    }
-}

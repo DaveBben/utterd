@@ -5,6 +5,8 @@ import Foundation
 /// The stage copies the audio file to a temp location, transcribes it, emits the
 /// result via `onResult`, and cleans up. It does not manage the scheduler lock
 /// or set `dateProcessed` on success — those are the caller's responsibility.
+/// On failure (file copy or transcription error), it marks the record as processed
+/// via `store.markProcessed` to prevent infinite re-processing.
 public final class TranscriptionPipelineStage: Sendable {
     private let transcriptionService: any TranscriptionService
     private let store: any MemoStore

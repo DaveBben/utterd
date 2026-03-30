@@ -100,9 +100,3 @@ struct MemoConsumerTests {
         #expect(logger.errors.count == 2)
     }
 }
-
-extension MockMemoStore {
-    func setInsertError(_ error: Error?) {
-        self.insertError = error
-    }
-}

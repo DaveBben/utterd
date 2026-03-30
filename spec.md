@@ -7,7 +7,7 @@
 
 ## What This Project Does
 
-Utterd is a macOS menu bar daemon that automatically triages voice memos into Reminders, Calendar, and Notes. It monitors the iCloud Voice Memos sync directory, extracts embedded transcripts, classifies them via a language model (on-device or remote), and creates items in the destination apps — no manual intervention after setup. Built for a single productivity-minded user who wants voice capture as a reliable front door to their trusted systems.
+Utterd is a macOS menu bar daemon that automatically triages voice memos into Reminders, Calendar, and Notes. It monitors the iCloud Voice Memos sync directory, transcribes audio via on-device speech-to-text (macOS 26+), classifies transcripts via a language model (on-device or remote), and creates items in the destination apps — no manual intervention after setup. Built for a single productivity-minded user who wants voice capture as a reliable front door to their trusted systems.
 
 ---
 
@@ -61,12 +61,12 @@ iCloud Sync ──▶ [File Watcher] ──▶ [Pipeline] ──▶ Reminders (E
 ```
 
 **Key design patterns:**
-- Sequential pipes-and-filters pipeline — detection → copy → extraction → classification → data extraction → routing → creation → dedup → cleanup. Each stage is an isolated function with typed inputs/outputs
+- Sequential pipes-and-filters pipeline — detection → copy → transcription → classification → data extraction → routing → creation → dedup → cleanup. Each stage is an isolated function with typed inputs/outputs
 - Protocol-based LLM provider abstraction — a Swift protocol defines the LLM interface; concrete types implement on-device and remote variants
 - Exactly-once processing via persistent dedup store — checked before processing, written after successful creation
 
 **Data flow:**
-A new .m4a file arrives in the watched directory → copied to a temp location → embedded transcript extracted from the copy → transcript sent to LLM for classification + structured data extraction → routing rules applied → item created in destination app via system API → file identity recorded in dedup store → temp copy cleaned up.
+A new .m4a file arrives in the watched directory → copied to a temp location → audio transcribed via on-device speech-to-text → transcript sent to LLM for classification + structured data extraction → routing rules applied → item created in destination app via system API → file identity recorded in dedup store → temp copy cleaned up.
 
 ---
 
@@ -192,8 +192,8 @@ class BadModel: ObservableObject {
 
 ## Known Gotchas
 
-- **Voice memo transcript format is undocumented**: The embedded transcript location/format within .m4a files is not publicly documented by Apple — needs investigation before implementing extraction
+- **Speech-to-text requires macOS 26+**: On-device transcription uses the `SpeechAnalyzer` API (available macOS 26+). Earlier macOS versions cannot run the transcription pipeline
 - **Foundation Model availability for unsandboxed apps**: The app runs outside the App Store sandbox. Whether macOS Foundation Model framework works for unsandboxed apps is unconfirmed
 - **Notes scripting bridge limitations**: Programmatic Notes access via Scripting Bridge is less well-documented than EventKit. Folder targeting and content formatting support need investigation
-- **App is partially implemented**: The voice memo file watcher (detection stage) is functional in `Libraries/Sources/Core/`. The menu bar icon (`MenuBarExtra`) is implemented and shows a static placeholder popover. Remaining pipeline stages (transcript extraction, classification, routing, creation) have not been implemented
+- **App is partially implemented**: The voice memo file watcher (detection stage) and transcription pipeline (Stage 1) are functional in `Libraries/Sources/Core/`. The menu bar icon (`MenuBarExtra`) is implemented and shows a static placeholder popover. Remaining pipeline stages (LLM classification, routing, creation) have not been implemented
 - **macOS 15 vs macOS 26 split**: On-device LLM requires macOS 26+. On macOS 15–25, the app requires a configured remote endpoint and must surface an alert if no provider is available

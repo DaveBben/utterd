@@ -6,7 +6,7 @@ import Speech
 struct SpeechAnalyzerTranscriptionService: TranscriptionService {
     func transcribe(fileURL: URL) async throws -> TranscriptionResult {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            throw TranscriptionError.fileNotFound(fileURL)
+            throw SpeechAnalyzerTranscriptionError.fileNotFound(fileURL)
         }
 
         let audioFile = try AVAudioFile(forReading: fileURL)
@@ -30,6 +30,6 @@ struct SpeechAnalyzerTranscriptionService: TranscriptionService {
     }
 }
 
-enum TranscriptionError: Error {
+enum SpeechAnalyzerTranscriptionError: Error {
     case fileNotFound(URL)
 }

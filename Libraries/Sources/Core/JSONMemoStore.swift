@@ -47,10 +47,12 @@ public actor JSONMemoStore: MemoStore {
         guard let index = records.firstIndex(where: { $0.fileURL.standardizedFileURL == normalized }) else {
             throw MemoStoreError.recordNotFound(url)
         }
+        let previousDate = records[index].dateProcessed
         records[index].dateProcessed = date
         do {
             try write()
         } catch {
+            records[index].dateProcessed = previousDate
             throw MemoStoreError.writeFailed(fileURL, underlying: error)
         }
     }
