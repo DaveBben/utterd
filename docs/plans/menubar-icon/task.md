@@ -96,10 +96,10 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Add `LSUIElement: true` to the `Utterd` target's `info.properties` in `project.yml`
-2. [ ] Run `xcodegen generate` to regenerate the Xcode project
-3. [ ] Verify the generated Info.plist contains `<key>LSUIElement</key><true/>` by reading the file — if the key is missing, the step fails
-4. [ ] Run `xcodebuild -scheme Utterd -destination 'platform=macOS' build` to verify the project compiles with the new setting
+1. [x] Add `LSUIElement: true` to the `Utterd` target's `info.properties` in `project.yml`
+2. [x] Run `xcodegen generate` to regenerate the Xcode project
+3. [x] Verify the generated Info.plist contains `<key>LSUIElement</key><true/>` by reading the file — if the key is missing, the step fails
+4. [x] Run `xcodebuild -scheme Utterd -destination 'platform=macOS' build` to verify the project compiles with the new setting
 
 No TDD cycle — this is a configuration-only task verified by compilation and file inspection.
 
