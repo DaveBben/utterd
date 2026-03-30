@@ -213,4 +213,40 @@ struct JSONMemoStoreTests {
         let found = await store.contains(fileURL: record.fileURL)
         #expect(found == false)
     }
+
+    @Test("markProcessed throws writeFailed and rolls back dateProcessed when file is unwritable")
+    func markProcessedRollsBackOnWriteFailure() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let writableURL = tempDir.appending(path: "\(UUID().uuidString).json")
+        let writableStore = JSONMemoStore(fileURL: writableURL)
+        let record = makeRecord(path: "/memos/rollback.m4a")
+        try await writableStore.insert(record)
+
+        // Copy data into a directory we'll make non-writable (atomic writes need dir access)
+        let data = try Data(contentsOf: writableURL)
+        let dir = tempDir.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let storeFile = dir.appending(path: "store.json")
+        try data.write(to: storeFile)
+        // Make the directory non-writable so atomic write fails (can't create temp file)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: dir.path)
+
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
+            try? FileManager.default.removeItem(at: dir)
+            try? FileManager.default.removeItem(at: writableURL)
+        }
+
+        let store = JSONMemoStore(fileURL: storeFile)
+        let processedDate = Date(timeIntervalSince1970: 2_000_000_000)
+
+        await #expect(throws: MemoStoreError.self) {
+            try await store.markProcessed(fileURL: record.fileURL, date: processedDate)
+        }
+
+        // dateProcessed should be rolled back — record should still be unprocessed
+        let oldest = await store.oldestUnprocessed()
+        #expect(oldest?.fileURL == record.fileURL)
+        #expect(oldest?.dateProcessed == nil)
+    }
 }
