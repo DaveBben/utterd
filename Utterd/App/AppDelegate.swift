@@ -25,6 +25,7 @@ func handleOpenSystemSettings(
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    var appState: AppState?
     private lazy var permissionChecker = PermissionChecker(fileSystem: RealFileSystemChecker())
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -34,8 +35,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // SwiftUI evaluates App.body (including MenuBarExtra scenes) BEFORE
+        // applicationDidFinishLaunching fires. The MenuBarExtra is conditionally
+        // included only when permissionResolved is true, preventing a "ghost icon"
+        // from appearing before the permission check completes.
         let action = evaluatePermissionGate(checker: permissionChecker)
-        if action == .showPermissionAlert {
+        if action == .proceed {
+            appState?.permissionResolved = true
+        } else {
             showPermissionAlert()
         }
     }

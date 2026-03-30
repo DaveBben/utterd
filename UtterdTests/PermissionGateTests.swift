@@ -1,4 +1,5 @@
 import Core
+import Foundation
 import Testing
 @testable import Utterd
 
@@ -43,5 +44,36 @@ struct PermissionGateTests {
         )
 
         #expect(terminateCallCount == 1)
+    }
+
+    // AC: handleOpenSystemSettings passes a URL containing "Privacy_AllFiles" to openURL
+    @Test("handleOpenSystemSettings opens URL containing Privacy_AllFiles")
+    @MainActor
+    func handleOpenSystemSettingsOpensPrivacyAllFilesURL() {
+        var receivedURL: URL?
+
+        handleOpenSystemSettings(
+            openURL: { url in receivedURL = url; return true },
+            terminate: { }
+        )
+
+        #expect(receivedURL?.absoluteString.contains("Privacy_AllFiles") == true)
+    }
+
+    // AC: after evaluatePermissionGate returns .proceed, the caller can set permissionResolved = true
+    @Test("permissionResolved can be set true after evaluatePermissionGate returns proceed")
+    @MainActor
+    func permissionResolvedSetAfterProceed() {
+        let mock = MockFileSystemChecker()
+        mock.readableResult = true
+        let checker = PermissionChecker(fileSystem: mock)
+        let appState = AppState()
+
+        let action = evaluatePermissionGate(checker: checker)
+        if action == .proceed {
+            appState.permissionResolved = true
+        }
+
+        #expect(appState.permissionResolved == true)
     }
 }
