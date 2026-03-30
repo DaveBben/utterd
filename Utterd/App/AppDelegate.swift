@@ -25,6 +25,7 @@ func handleOpenSystemSettings(
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Written once by UtterdApp.body before applicationDidFinishLaunching fires.
     var appState: AppState?
     private lazy var permissionChecker = PermissionChecker(fileSystem: RealFileSystemChecker())
 

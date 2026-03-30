@@ -33,7 +33,7 @@ Users have no persistent, low-interruption indicator that the voice memo triage 
 
 ### Out (explicitly)
 - Real voice memo watcher integration for sync status — deferred to a future plan
-- Wiring the popover "Settings..." button to open the Settings window — deferred (the button is a visible placeholder; Cmd+, still works)
+- Wiring the popover "Settings..." button to open the Settings window — deferred (the button is a visible placeholder; Cmd+, is broken by LSUIElement — see AC-04.3)
 - Any notification or alert system
 - Custom icon artwork — using built-in system symbol
 - Popover auto-dismiss behavior customization
@@ -142,7 +142,7 @@ The popover content, from top to bottom:
 - [x] Should clicking "Settings..." in the popover open the Settings window?
   - Context: A Settings scene already exists in the app, accessible via Cmd+,
   - Options considered: Wire it now, leave as no-op, show "coming soon" tooltip
-  - Decision: Leave as no-op; Cmd+, still opens Settings via the existing scene
+  - Decision: Leave as no-op; Cmd+, is broken by LSUIElement (see AC-04.3), so Settings is currently inaccessible until the button is wired
   - Reasoning: Wiring the button is trivial future work; the placeholder communicates intent without adding scope
 
 - [x] Should Quit show a confirmation dialog?
@@ -156,5 +156,5 @@ The popover content, from top to bottom:
 ## Out of Scope (Clarification)
 
 - **Real sync status from VoiceMemoWatcher** — discussed because the popover shows sync info, but wiring the watcher to AppState is a separate feature. Static placeholders used here so the UI can be built and tested independently.
-- **Settings window functionality via popover button** — the Settings scene already exists in the codebase and remains accessible via Cmd+,. Wiring the popover "Settings..." button to open it will be a separate small change once the menu bar is in place.
+- **Settings window functionality via popover button** — the Settings scene exists in the codebase but is currently inaccessible (LSUIElement removes the app menu bar, breaking Cmd+,). Wiring the popover "Settings..." button is deferred to a future plan.
 - **Notification badges or icon state changes** — came up implicitly (daemon status), but visual state changes to the icon (e.g., red dot for errors) are deferred until the processing pipeline exists.
