@@ -15,9 +15,8 @@ struct UtterdApp: App {
             get: { appState.permissionResolved },
             set: { appState.permissionResolved = $0 }
         )) {
-            MenuBarPopoverView()
+            MenuBarMenuContent()
         }
-        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView()
