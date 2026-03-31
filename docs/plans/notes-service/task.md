@@ -353,7 +353,7 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write integration test infrastructure and failing tests:
+1. [x] Write integration test infrastructure and failing tests:
    - Create `requireNotesAccess()` helper: attempt `tell application "Notes" to name of default account` via `NSAppleScriptExecutor` — if it fails, skip with a descriptive message
    - Create cleanup sweep: at suite start, find and delete notes with `UTTERD_TEST_` prefix from previous failed runs
    - Test: create note in default folder → `.created` returned, `noteExists` confirms it (AC-02.2, AC-03.1)
@@ -362,9 +362,9 @@ None — all decisions resolved during planning.
    - Test: `noteExists` for a UUID title never created returns `false` (AC-03.2)
    - Test: create note succeeds regardless of Notes app state — Notes auto-launches (AC-02.4)
    - Add per-test teardown deleting created test notes
-2. [ ] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
-3. [ ] Wire tests using `AppleScriptNotesService(executor: NSAppleScriptExecutor())` — real implementation with real Notes access
-4. [ ] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+2. [x] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+3. [x] Wire tests using `AppleScriptNotesService(executor: NSAppleScriptExecutor())` — real implementation with real Notes access
+4. [x] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
 
 **Acceptance Criteria:**
 
