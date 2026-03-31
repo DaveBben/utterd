@@ -18,8 +18,9 @@ public struct LLMContextBudget: Sendable, Equatable {
     }
 
     /// Words available for a new chunk, reserving space for the rolling summary.
+    /// Uses `max(1, ...)` to prevent zero from floating-point truncation on small budgets.
     public var availableForNewChunk: Int {
-        Int(Double(availableForContent) * (1 - summaryReserveRatio))
+        max(1, Int(Double(availableForContent) * (1 - summaryReserveRatio)))
     }
 
     public init(totalWords: Int, systemPromptOverhead: Int, summaryReserveRatio: Double = 0.3) {
