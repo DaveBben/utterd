@@ -4,15 +4,4 @@
 public enum NoteCreationResult: Sendable, Equatable {
     case created
     case createdInDefaultFolder(reason: String)
-
-    public static func == (lhs: NoteCreationResult, rhs: NoteCreationResult) -> Bool {
-        switch (lhs, rhs) {
-        case (.created, .created):
-            return true
-        case (.createdInDefaultFolder(let l), .createdInDefaultFolder(let r)):
-            return l == r
-        default:
-            return false
-        }
-    }
 }

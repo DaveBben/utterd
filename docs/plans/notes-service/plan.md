@@ -45,7 +45,7 @@ The app's pipeline will classify voice memo transcripts and route some of them t
 
 - **Platform**: macOS 15+ (Sequoia), Swift 6.2 with strict concurrency (`complete`)
 - **Project structure**: Protocols live in `Libraries/Sources/Core/`; concrete macOS-specific implementations live in `Utterd/Core/` (established pattern: `TranscriptionService` protocol → `SpeechAnalyzerTranscriptionService` concrete)
-- **Apple Notes access**: No direct Swift API exists. AppleScript via `NSAppleScript` or `Process` running `osascript` is the chosen mechanism. The spec originally recorded "Scripting Bridge" but AppleScript was chosen for its simpler integration model — the spec should be updated to reflect this
+- **Apple Notes access**: No direct Swift API exists. AppleScript via `NSAppleScript` or `Process` running `osascript` is the chosen mechanism. The spec originally recorded "Scripting Bridge" but AppleScript was chosen for its simpler integration model (spec updated to reflect this)
 - **Concurrency requirements**: Protocols must be `Sendable`. AppleScript execution is synchronous and should not block the main actor
 - **Testing**: Swift Testing (`@Test`, `#expect`). Mocks live in `Libraries/Tests/CoreTests/Mocks/`
 
@@ -119,7 +119,7 @@ So that I can confirm the service works end-to-end.
 **Dependencies**
 - Apple Notes app installed on the user's machine (ships with macOS)
 - macOS Automation permission granted by the user for Utterd to control Notes
-- Project spec: `spec.md` (needs update: change "Scripting Bridge" to "AppleScript" in the architecture decisions table)
+- Project spec: `spec.md` (updated to reflect AppleScript choice)
 
 **Assumptions**
 - AppleScript can enumerate Notes folders and their hierarchy (the Notes AppleScript dictionary supports `folder` objects with `name` and `container` properties)
@@ -162,4 +162,4 @@ So that I can confirm the service works end-to-end.
 - **Shared DestinationService protocol across Notes/Calendar/Reminders** — discussed whether all three destinations should share a common interface. Deferred because the three services have fundamentally different capabilities (folders vs. calendars vs. lists) and a forced common abstraction would be leaky. Each gets its own protocol
 - **Folder creation** — discussed whether to auto-create missing folders. Decided to fall back to the default folder instead, keeping the service read-only for folder structure
 - **UI for folder mapping** — mentioned as a potential future feature for letting users map categories to folders. No UI work in this plan
-- **Spec update for Scripting Bridge → AppleScript** — the spec's architecture decisions table should be updated to reflect the AppleScript choice, but that is a spec maintenance task, not part of this service implementation
+- **Spec update for Scripting Bridge → AppleScript** — completed; spec.md updated in this branch

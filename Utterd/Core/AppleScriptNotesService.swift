@@ -184,7 +184,14 @@ struct AppleScriptNotesService: NotesService {
                 end try
             end tell
             """
-        let result = try await executor.execute(script: script)
+        let result: String
+        do {
+            result = try await executor.execute(script: script)
+        } catch NotesServiceError.automationPermissionDenied {
+            throw NotesServiceError.automationPermissionDenied
+        } catch {
+            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+        }
         return result.trimmingCharacters(in: .whitespacesAndNewlines) == "found"
     }
 
