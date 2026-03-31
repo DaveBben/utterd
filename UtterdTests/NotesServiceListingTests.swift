@@ -147,23 +147,19 @@ struct NotesServiceListingTests {
         #expect(hierarchy[2].id == "leafId")
     }
 
-    // MARK: - resolveHierarchy with unknown containerID throws folderNotFound
+    // MARK: - resolveHierarchy stops at unknown containerID (account root)
 
-    @Test("resolveHierarchy throws folderNotFound when containerID references unknown folder")
-    func resolveHierarchyUnknownContainer() async throws {
+    @Test("resolveHierarchy stops walking when containerID is not a folder (e.g. account)")
+    func resolveHierarchyUnknownContainerStopsAtRoot() async throws {
         let mock = MockScriptExecutor()
-        // Bulk output only has the child — parent is missing from the list
-        mock.executeResults = [.success("childId\tTaxes\tghostId\n")]
+        // Bulk output only has the child — containerID "accountId" is the account, not a folder
+        mock.executeResults = [.success("childId\tTaxes\taccountId\n")]
         let service = AppleScriptNotesService(executor: mock)
-        let folder = NotesFolder(id: "childId", name: "Taxes", containerID: "ghostId")
+        let folder = NotesFolder(id: "childId", name: "Taxes", containerID: "accountId")
 
-        do {
-            _ = try await service.resolveHierarchy(for: folder)
-            Issue.record("Expected folderNotFound to be thrown")
-        } catch NotesServiceError.folderNotFound {
-            // expected
-        } catch {
-            Issue.record("Expected folderNotFound, got \(error)")
-        }
+        let hierarchy = try await service.resolveHierarchy(for: folder)
+        // Walk stops at the unrecognized containerID — folder is treated as a root
+        #expect(hierarchy.count == 1)
+        #expect(hierarchy[0].id == "childId")
     }
 }

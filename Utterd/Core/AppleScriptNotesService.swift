@@ -117,7 +117,8 @@ struct AppleScriptNotesService: NotesService {
                 throw NotesServiceError.folderNotFound("Circular folder hierarchy detected")
             }
             guard let parent = byID[containerID] else {
-                throw NotesServiceError.folderNotFound(containerID)
+                // containerID points to the account, not a folder — we've reached the root
+                break
             }
             path.append(parent)
             current = parent
