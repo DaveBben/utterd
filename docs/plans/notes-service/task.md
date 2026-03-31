@@ -182,9 +182,9 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Add `AppleScriptNotesService` struct declaration with a stored `ScriptExecutor` property and initializer: `struct AppleScriptNotesService { let executor: any ScriptExecutor; init(executor: any ScriptExecutor = NSAppleScriptExecutor()) }`
-2. [ ] Add `NotesService` conformance with placeholder method stubs that throw `fatalError("Not yet implemented")` — this establishes the struct's shape for subsequent tasks to fill in
-3. [ ] Verify compilation: `xcodebuild -scheme Utterd -destination 'platform=macOS' build 2>&1 | tail -20`
+1. [x] Add `AppleScriptNotesService` struct declaration with a stored `ScriptExecutor` property and initializer: `struct AppleScriptNotesService { let executor: any ScriptExecutor; init(executor: any ScriptExecutor = NSAppleScriptExecutor()) }`
+2. [x] Add `NotesService` conformance with placeholder method stubs that throw `fatalError("Not yet implemented")` — this establishes the struct's shape for subsequent tasks to fill in
+3. [x] Verify compilation: `xcodebuild -scheme Utterd -destination 'platform=macOS' build 2>&1 | tail -20`
 
 **Acceptance Criteria:**
 

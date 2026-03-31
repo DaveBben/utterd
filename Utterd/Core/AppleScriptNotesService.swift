@@ -22,3 +22,30 @@ extension String {
 protocol ScriptExecutor: Sendable {
     func execute(script: String) async throws -> String
 }
+
+// MARK: - AppleScriptNotesService
+
+/// Concrete ``NotesService`` implementation backed by AppleScript.
+struct AppleScriptNotesService: NotesService {
+    let executor: any ScriptExecutor
+
+    init(executor: any ScriptExecutor = NSAppleScriptExecutor()) {
+        self.executor = executor
+    }
+
+    func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder] {
+        fatalError("Not yet implemented")
+    }
+
+    func resolveHierarchy(for folder: NotesFolder) async throws -> [NotesFolder] {
+        fatalError("Not yet implemented")
+    }
+
+    func createNote(title: String, body: String, in folder: NotesFolder?) async throws -> NoteCreationResult {
+        fatalError("Not yet implemented")
+    }
+
+    func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool {
+        fatalError("Not yet implemented")
+    }
+}
