@@ -127,18 +127,3 @@ struct NotesServiceCreationTests {
         #expect(script.contains(#"He said \"hello\""#))
     }
 }
-
-// MARK: - Equatable conformance for pattern matching in tests
-
-extension NoteCreationResult: Equatable {
-    public static func == (lhs: NoteCreationResult, rhs: NoteCreationResult) -> Bool {
-        switch (lhs, rhs) {
-        case (.created, .created):
-            return true
-        case (.createdInDefaultFolder, .createdInDefaultFolder):
-            return true
-        default:
-            return false
-        }
-    }
-}

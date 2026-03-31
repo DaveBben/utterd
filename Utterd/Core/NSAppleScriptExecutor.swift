@@ -13,6 +13,7 @@ struct NSAppleScriptExecutor: ScriptExecutor {
 
             if let errorInfo {
                 let errorNumber = (errorInfo[NSAppleScript.errorNumber] as? Int) ?? 0
+                // -1743 = errAEEventNotPermitted — user denied Automation permission for this app
                 if errorNumber == -1743 {
                     throw NotesServiceError.automationPermissionDenied
                 }

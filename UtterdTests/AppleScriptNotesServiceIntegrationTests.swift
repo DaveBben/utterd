@@ -7,28 +7,28 @@ import Testing
 // All tests are guarded by requireNotesAccess() and skipped gracefully when Notes is not available.
 // All test notes use UTTERD_TEST_{uuid} prefixed titles for identification and cleanup.
 
+// Verifies Notes is accessible before running a test.
+// If Notes is not accessible, #require throws a RequirementFailure, stopping the test
+// with a clear message rather than a cryptic assertion failure from the real operation.
+private func requireNotesAccess() async throws {
+    let executor = NSAppleScriptExecutor()
+    let script = #"tell application "Notes" to name of default account"#
+    let accessible: Bool
+    do {
+        _ = try await executor.execute(script: script)
+        accessible = true
+    } catch {
+        accessible = false
+    }
+    try #require(
+        accessible,
+        "Apple Notes is not accessible — grant Automation permission or run on a system with Notes."
+    )
+}
+
 @Suite("AppleScriptNotesService Integration")
 struct AppleScriptNotesServiceIntegrationTests {
     let service = AppleScriptNotesService(executor: NSAppleScriptExecutor())
-
-    // Verify Notes is accessible before any test in this suite.
-    // If Notes is not accessible, #require throws a RequirementFailure, stopping the test
-    // with a clear message rather than a cryptic assertion failure from the real operation.
-    private func requireNotesAccess() async throws {
-        let executor = NSAppleScriptExecutor()
-        let script = #"tell application "Notes" to name of default account"#
-        let accessible: Bool
-        do {
-            _ = try await executor.execute(script: script)
-            accessible = true
-        } catch {
-            accessible = false
-        }
-        try #require(
-            accessible,
-            "Apple Notes is not accessible — grant Automation permission or run on a system with Notes."
-        )
-    }
 
     // Deletes all notes with titles starting with UTTERD_TEST_ from previous failed runs.
     private func cleanupOrphanedTestNotes() async {
@@ -158,22 +158,6 @@ struct AppleScriptNotesServiceIntegrationTests {
 @Suite("AppleScriptNotesService Folder Integration")
 struct AppleScriptNotesServiceFolderIntegrationTests {
     let service = AppleScriptNotesService(executor: NSAppleScriptExecutor())
-
-    private func requireNotesAccess() async throws {
-        let executor = NSAppleScriptExecutor()
-        let script = #"tell application "Notes" to name of default account"#
-        let accessible: Bool
-        do {
-            _ = try await executor.execute(script: script)
-            accessible = true
-        } catch {
-            accessible = false
-        }
-        try #require(
-            accessible,
-            "Apple Notes is not accessible — grant Automation permission or run on a system with Notes."
-        )
-    }
 
     // MARK: - AC-01.1, AC-01.4: listFolders(in: nil) returns [NotesFolder] (may be empty)
 

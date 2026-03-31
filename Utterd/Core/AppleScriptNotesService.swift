@@ -103,11 +103,19 @@ struct AppleScriptNotesService: NotesService {
         }
 
         let allFolders = parseFolderLines(raw)
-        let byID = Dictionary(uniqueKeysWithValues: allFolders.map { ($0.id, $0) })
+        let byID = Dictionary(allFolders.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
 
-        var path: [NotesFolder] = [folder]
-        var current = folder
+        guard let freshFolder = byID[folder.id] else {
+            throw NotesServiceError.folderNotFound(folder.id)
+        }
+
+        var visited = Set<String>()
+        var path: [NotesFolder] = [freshFolder]
+        var current = freshFolder
         while let containerID = current.containerID {
+            guard visited.insert(containerID).inserted else {
+                throw NotesServiceError.folderNotFound("Circular folder hierarchy detected")
+            }
             guard let parent = byID[containerID] else {
                 throw NotesServiceError.folderNotFound(containerID)
             }
@@ -147,14 +155,20 @@ struct AppleScriptNotesService: NotesService {
                         make new note at targetFolder with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
                     end tell
                     """
-                _ = try await executor.execute(script: script)
+                do {
+                    _ = try await executor.execute(script: script)
+                } catch NotesServiceError.automationPermissionDenied {
+                    throw NotesServiceError.automationPermissionDenied
+                } catch {
+                    throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+                }
                 return .created
             } else {
-                try await createNoteInDefaultAccount(title: escapedTitle, body: escapedBody)
+                try await createNoteInDefaultAccount(escapedTitle: escapedTitle, escapedBody: escapedBody)
                 return .createdInDefaultFolder(reason: "Folder no longer exists")
             }
         } else {
-            try await createNoteInDefaultAccount(title: escapedTitle, body: escapedBody)
+            try await createNoteInDefaultAccount(escapedTitle: escapedTitle, escapedBody: escapedBody)
             return .created
         }
     }
@@ -171,16 +185,22 @@ struct AppleScriptNotesService: NotesService {
             end tell
             """
         let result = try await executor.execute(script: script)
-        return result.trimmingCharacters(in: .whitespacesAndNewlines) != "not found"
+        return result.trimmingCharacters(in: .whitespacesAndNewlines) == "found"
     }
 
-    private func createNoteInDefaultAccount(title: String, body: String) async throws {
+    private func createNoteInDefaultAccount(escapedTitle: String, escapedBody: String) async throws {
         let script = """
             tell application "Notes"
-                make new note at default account with properties {name:"\(title)", body:"\(body)"}
+                make new note at default account with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
             end tell
             """
-        _ = try await executor.execute(script: script)
+        do {
+            _ = try await executor.execute(script: script)
+        } catch NotesServiceError.automationPermissionDenied {
+            throw NotesServiceError.automationPermissionDenied
+        } catch {
+            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+        }
     }
 
     func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool {
@@ -203,7 +223,14 @@ struct AppleScriptNotesService: NotesService {
                 end tell
                 """
         }
-        let result = try await executor.execute(script: script)
+        let result: String
+        do {
+            result = try await executor.execute(script: script)
+        } catch NotesServiceError.automationPermissionDenied {
+            throw NotesServiceError.automationPermissionDenied
+        } catch {
+            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+        }
         return result.trimmingCharacters(in: .whitespacesAndNewlines) == "true"
     }
 }

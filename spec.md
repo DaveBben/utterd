@@ -53,7 +53,7 @@ Utterd is a macOS menu bar daemon that automatically triages voice memos into Re
 ```
 iCloud Sync ──▶ [File Watcher] ──▶ [Pipeline] ──▶ Reminders (EventKit)
   (.m4a files)        │                               Calendar  (EventKit)
-                      │                               Notes     (Scripting Bridge)
+                      │                               Notes     (AppleScript)
                       ▼
                  [LLM Provider]
                   ├─ On-device (Foundation Model, macOS 26+)
@@ -79,7 +79,7 @@ A new .m4a file arrives in the watched directory → copied to a temp location �
 | Swift 6.2 strict concurrency (`complete`) | Eliminates data races at compile time; required for Foundation Model framework | 2026-03-24 | Relaxed concurrency — rejected, doesn't catch bugs early enough |
 | SwiftUI MenuBarExtra over AppKit NSStatusItem | Native SwiftUI integration, less boilerplate, aligns with @Observable pattern | 2026-03-24 | AppKit NSStatusItem — rejected unless SwiftUI proves insufficient |
 | @Observable over ObservableObject | Per-property view invalidation, less boilerplate, modern Swift pattern | 2026-03-24 | ObservableObject + @Published — legacy pattern |
-| Scripting Bridge for Notes | Only known mechanism for programmatic Notes access with folder targeting | 2026-03-24 | No alternative available |
+| AppleScript for Notes | Only known mechanism for programmatic Notes access with folder targeting | 2026-03-24 | Scripting Bridge — rejected; NSAppleScript avoids generated bridge headers and works without App Store entitlements |
 | Keychain for remote LLM credentials | macOS security standard — avoids plaintext secrets in config files | 2026-03-24 | Plaintext in YAML config — rejected for security |
 
 ---
@@ -158,7 +158,7 @@ class BadModel: ObservableObject {
 | macOS Foundation Model (macOS 26+) | On-device LLM for classification/extraction | None (on-device) | Apple platform docs |
 | Remote LLM (OpenAI-compatible) | Fallback LLM provider | API key in Keychain | User-configured endpoint URL |
 | EventKit | Reminders and Calendar item creation | System permission prompt | Apple EventKit docs |
-| Scripting Bridge | Notes item creation with folder targeting | Automation permission | Apple Scripting Bridge docs |
+| AppleScript (NSAppleScript) | Notes item creation with folder targeting | Automation permission | Apple AppleScript docs |
 | System Keychain | Secure credential storage for remote LLM | Keychain Services API | Apple Security framework docs |
 | FSEvents (CoreServices) | File system monitoring for new voice memos | Disk access permission | Apple FSEvents docs |
 
@@ -194,6 +194,6 @@ class BadModel: ObservableObject {
 
 - **Speech-to-text requires macOS 26+**: On-device transcription uses the `SpeechAnalyzer` API (available macOS 26+). Earlier macOS versions cannot run the transcription pipeline
 - **Foundation Model availability for unsandboxed apps**: The app runs outside the App Store sandbox. Whether macOS Foundation Model framework works for unsandboxed apps is unconfirmed
-- **Notes scripting bridge limitations**: Programmatic Notes access via Scripting Bridge is less well-documented than EventKit. Folder targeting and content formatting support need investigation
+- **Notes AppleScript limitations**: Programmatic Notes access via AppleScript is less well-documented than EventKit. Folder targeting and content formatting support need investigation
 - **App is partially implemented**: The voice memo file watcher (detection stage) and transcription pipeline (Stage 1) are functional in `Libraries/Sources/Core/`. The menu bar icon (`MenuBarExtra`) is implemented and shows a static placeholder popover. Remaining pipeline stages (LLM classification, routing, creation) have not been implemented
 - **macOS 15 vs macOS 26 split**: On-device LLM requires macOS 26+. On macOS 15–25, the app requires a configured remote endpoint and must surface an alert if no provider is available

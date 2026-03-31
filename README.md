@@ -13,6 +13,8 @@ A macOS daemon that routes voice memos to Reminders, Calendar, and Notes
 
 Utterd requires **Full Disk Access** to read voice memos from iCloud. On first launch, the app will prompt you to grant access in System Settings > Privacy & Security > Full Disk Access. Grant access and relaunch the app.
 
+Utterd also requires **Automation** permission to control Apple Notes. macOS will show a one-time prompt the first time the app tries to create a note. If you deny it, go to System Settings > Privacy & Security > Automation and enable Notes for Utterd.
+
 ## Getting Started
 
 ```bash
