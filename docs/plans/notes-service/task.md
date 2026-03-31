@@ -131,7 +131,7 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing tests for the string escaping helper:
+1. [x] Write failing tests for the string escaping helper:
    - Test: plain string `hello` passes through unchanged
    - Test: string `He said "hello"` → `He said \"hello\"`
    - Test: string `path\to\file` → `path\\to\\file`
@@ -139,15 +139,15 @@ None — all decisions resolved during planning.
    - Test: empty string → empty string
    - Test: string with unicode/emoji passes through unchanged
    - Test: string with embedded carriage return (U+000D) → CR replaced with newline (U+000A)
-2. [ ] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
-3. [ ] Implement `String.appleScriptEscaped` computed property in `AppleScriptNotesService.swift`: replace `\` with `\\`, then `"` with `\"`, then `\r` with `\n`
-4. [ ] Define `ScriptExecutor` protocol in `AppleScriptNotesService.swift`: `protocol ScriptExecutor: Sendable { func execute(script: String) async throws -> String }`
-5. [ ] Implement `NSAppleScriptExecutor` in `NSAppleScriptExecutor.swift`: a struct conforming to `ScriptExecutor`. Execute script via `await MainActor.run { ... }`. Use `guard let script = NSAppleScript(source: source) else { throw ... }` (no force-unwrap). Detect error number -1743 → throw `NotesServiceError.automationPermissionDenied`. Other errors → throw `NotesServiceError.scriptExecutionFailed(description)`
-6. [ ] Create `MockScriptExecutor` in `UtterdTests/Mocks/MockScriptExecutor.swift`: `final class MockScriptExecutor: ScriptExecutor, @unchecked Sendable` with `nonisolated(unsafe) var executeResults: [Result<String, Error>] = []` (queue — each call pops the first element), `nonisolated(unsafe) var executeCalls: [String] = []`. When `executeResults` is empty, return `""`. This supports multi-call test scenarios (e.g., folder-check then creation)
-7. [ ] Create `MockNotesService` in `Libraries/Tests/CoreTests/Mocks/MockNotesService.swift`: `final class MockNotesService: NotesService, @unchecked Sendable` following `MockTranscriptionService` pattern — `nonisolated(unsafe)` configurable results/errors and call-tracking arrays for each protocol method
-8. [ ] Add `com.apple.security.automation.apple-events` key (value `true`) to `Utterd/Resources/Utterd.entitlements`. Add `NSAppleEventsUsageDescription` to `project.yml` under `targets.Utterd.info.properties` with value `"Utterd needs permission to create notes in Apple Notes."`
-9. [ ] Run tests to verify escaping tests pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
-10. [ ] Verify mock compiles: `cd Libraries && swift build --build-tests </dev/null 2>&1`
+2. [x] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+3. [x] Implement `String.appleScriptEscaped` computed property in `AppleScriptNotesService.swift`: replace `\` with `\\`, then `"` with `\"`, then `\r` with `\n`
+4. [x] Define `ScriptExecutor` protocol in `AppleScriptNotesService.swift`: `protocol ScriptExecutor: Sendable { func execute(script: String) async throws -> String }`
+5. [x] Implement `NSAppleScriptExecutor` in `NSAppleScriptExecutor.swift`: a struct conforming to `ScriptExecutor`. Execute script via `await MainActor.run { ... }`. Use `guard let script = NSAppleScript(source: source) else { throw ... }` (no force-unwrap). Detect error number -1743 → throw `NotesServiceError.automationPermissionDenied`. Other errors → throw `NotesServiceError.scriptExecutionFailed(description)`
+6. [x] Create `MockScriptExecutor` in `UtterdTests/Mocks/MockScriptExecutor.swift`: `final class MockScriptExecutor: ScriptExecutor, @unchecked Sendable` with `nonisolated(unsafe) var executeResults: [Result<String, Error>] = []` (queue — each call pops the first element), `nonisolated(unsafe) var executeCalls: [String] = []`. When `executeResults` is empty, return `""`. This supports multi-call test scenarios (e.g., folder-check then creation)
+7. [x] Create `MockNotesService` in `Libraries/Tests/CoreTests/Mocks/MockNotesService.swift`: `final class MockNotesService: NotesService, @unchecked Sendable` following `MockTranscriptionService` pattern — `nonisolated(unsafe)` configurable results/errors and call-tracking arrays for each protocol method
+8. [x] Add `com.apple.security.automation.apple-events` key (value `true`) to `Utterd/Resources/Utterd.entitlements`. Add `NSAppleEventsUsageDescription` to `project.yml` under `targets.Utterd.info.properties` with value `"Utterd needs permission to create notes in Apple Notes."`
+9. [x] Run tests to verify escaping tests pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+10. [x] Verify mock compiles: `cd Libraries && swift build --build-tests </dev/null 2>&1`
 
 **Acceptance Criteria:**
 

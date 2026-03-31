@@ -41,6 +41,7 @@ targets:
         LSMinimumSystemVersion: "15.0"
         LSUIElement: true
         NSSpeechRecognitionUsageDescription: "Utterd uses speech recognition to transcribe your voice memos."
+        NSAppleEventsUsageDescription: "Utterd needs permission to create notes in Apple Notes."
 
   UtterdTests:
     type: bundle.unit-test
