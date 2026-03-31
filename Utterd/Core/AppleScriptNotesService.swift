@@ -34,11 +34,104 @@ struct AppleScriptNotesService: NotesService {
     }
 
     func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder] {
-        fatalError("Not yet implemented")
+        let script: String
+        if let parent {
+            script = """
+                tell application "Notes"
+                    set output to ""
+                    set targetFolder to folder id "\(parent.id.appleScriptEscaped)"
+                    repeat with f in folders of targetFolder
+                        set fid to id of f
+                        set fname to name of f
+                        set cid to id of container of f
+                        set output to output & fid & tab & fname & tab & cid & linefeed
+                    end repeat
+                    return output
+                end tell
+                """
+        } else {
+            script = """
+                tell application "Notes"
+                    set output to ""
+                    repeat with f in folders of default account
+                        set fid to id of f
+                        set fname to name of f
+                        set output to output & fid & tab & fname & tab & linefeed
+                    end repeat
+                    return output
+                end tell
+                """
+        }
+
+        let raw: String
+        do {
+            raw = try await executor.execute(script: script)
+        } catch NotesServiceError.automationPermissionDenied {
+            throw NotesServiceError.automationPermissionDenied
+        } catch {
+            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+        }
+
+        return parseFolderLines(raw)
     }
 
     func resolveHierarchy(for folder: NotesFolder) async throws -> [NotesFolder] {
-        fatalError("Not yet implemented")
+        let script = """
+            tell application "Notes"
+                set output to ""
+                repeat with f in every folder of default account
+                    set fid to id of f
+                    set fname to name of f
+                    try
+                        set cid to id of container of f
+                    on error
+                        set cid to ""
+                    end try
+                    set output to output & fid & tab & fname & tab & cid & linefeed
+                end repeat
+                return output
+            end tell
+            """
+
+        let raw: String
+        do {
+            raw = try await executor.execute(script: script)
+        } catch NotesServiceError.automationPermissionDenied {
+            throw NotesServiceError.automationPermissionDenied
+        } catch {
+            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+        }
+
+        let allFolders = parseFolderLines(raw)
+        let byID = Dictionary(uniqueKeysWithValues: allFolders.map { ($0.id, $0) })
+
+        var path: [NotesFolder] = [folder]
+        var current = folder
+        while let containerID = current.containerID {
+            guard let parent = byID[containerID] else {
+                throw NotesServiceError.folderNotFound(containerID)
+            }
+            path.append(parent)
+            current = parent
+        }
+
+        return path.reversed()
+    }
+
+    // Parses tab-delimited folder output: each line is "id\tname\tcontainerID\n".
+    // containerID field may be empty (top-level folders).
+    private func parseFolderLines(_ raw: String) -> [NotesFolder] {
+        raw.components(separatedBy: "\n")
+            .filter { !$0.isEmpty }
+            .compactMap { line -> NotesFolder? in
+                let fields = line.components(separatedBy: "\t")
+                guard fields.count >= 3 else { return nil }
+                let id = fields[0]
+                let name = fields[1]
+                let containerID = fields[2].isEmpty ? nil : fields[2]
+                guard !id.isEmpty else { return nil }
+                return NotesFolder(id: id, name: name, containerID: containerID)
+            }
     }
 
     func createNote(title: String, body: String, in folder: NotesFolder?) async throws -> NoteCreationResult {

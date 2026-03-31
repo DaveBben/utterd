@@ -303,7 +303,7 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing tests using `MockScriptExecutor`:
+1. [x] Write failing tests using `MockScriptExecutor`:
    - Test: `listFolders(in: nil)` parses mock output `"id1\tFinance\t\nid2\tPersonal\t\n"` into two `NotesFolder` structs with correct `id`, `name`, `containerID` (AC-01.1)
    - Test: `listFolders(in: parentFolder)` constructs script referencing parent's ID and returns children (AC-01.2)
    - Test: `listFolders` with empty mock output returns empty array (AC-01.4)
@@ -313,11 +313,11 @@ None — all decisions resolved during planning.
    - Test: `resolveHierarchy` for nested folder — mock returns bulk output `"parentId\tFinance\t\nchildId\tTaxes\tparentId\n"`, given folder with id `"childId"` and containerID `"parentId"`, result is `[finance, taxes]` in root-to-leaf order (AC-01.3)
    - Test: `resolveHierarchy` for deeply nested folder (3 levels) returns correct path (edge: deep hierarchies)
    - Test: `resolveHierarchy` when containerID references unknown folder → throws `folderNotFound`
-2. [ ] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
-3. [ ] Implement `listFolders(in:)`: construct AppleScript using `tell application "Notes"`. For nil parent, get top-level folders of default account. For a specific parent, get child folders of that folder by ID. Return each folder's `id`, `name`, and container `id` as tab-delimited fields, one folder per line. Parse the output into `[NotesFolder]` structs. Apple Notes' `every folder` only returns immediate children — this is correct for the `listFolders` API contract
-4. [ ] Implement `resolveHierarchy(for:)`: execute a single AppleScript call that returns all folders for the default account (id, name, containerID for each — recursive enumeration). Build a `[String: NotesFolder]` dictionary keyed by folder ID. Starting from the given folder, walk up through `containerID` references, collecting ancestors. Reverse the collected array to produce root-to-leaf order. If a `containerID` is not found in the dictionary, throw `NotesServiceError.folderNotFound`
-5. [ ] Remove the `fatalError` stubs from Task 2 — all four protocol methods now have real implementations
-6. [ ] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+2. [x] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+3. [x] Implement `listFolders(in:)`: construct AppleScript using `tell application "Notes"`. For nil parent, get top-level folders of default account. For a specific parent, get child folders of that folder by ID. Return each folder's `id`, `name`, and container `id` as tab-delimited fields, one folder per line. Parse the output into `[NotesFolder]` structs. Apple Notes' `every folder` only returns immediate children — this is correct for the `listFolders` API contract
+4. [x] Implement `resolveHierarchy(for:)`: execute a single AppleScript call that returns all folders for the default account (id, name, containerID for each — recursive enumeration). Build a `[String: NotesFolder]` dictionary keyed by folder ID. Starting from the given folder, walk up through `containerID` references, collecting ancestors. Reverse the collected array to produce root-to-leaf order. If a `containerID` is not found in the dictionary, throw `NotesServiceError.folderNotFound`
+5. [x] Remove the `fatalError` stubs from Task 2 — all four protocol methods now have real implementations
+6. [x] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
 
 **Acceptance Criteria:**
 
