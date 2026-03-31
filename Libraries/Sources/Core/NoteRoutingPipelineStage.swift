@@ -34,6 +34,102 @@ public final class NoteRoutingPipelineStage: Sendable {
     }
 
     public func route(_ result: TranscriptionResult) async {
-        // Implementation in Task 5
+        let transcript = result.transcript
+        let fileURL = result.fileURL
+        let now = Date()
+
+        do {
+            try await routeCore(transcript: transcript, now: now)
+        } catch {
+            logger.error("Note routing failed: \(error)")
+        }
+
+        // Cleanup always runs regardless of success or failure — not a defer because
+        // defer cannot contain await in Swift.
+        try? await store.markProcessed(fileURL: fileURL, date: now)
+        await onComplete()
     }
+
+    // MARK: - Private
+
+    private func routeCore(transcript: String, now: Date) async throws {
+        // Empty transcript: skip classification, create note in default folder
+        if transcript.isEmpty {
+            _ = try await notesService.createNote(
+                title: dateFallbackTitle(for: now),
+                body: "",
+                in: nil
+            )
+            return
+        }
+
+        // Build folder hierarchy; if empty, skip classification
+        let hierarchy = try await buildFolderHierarchy(using: notesService)
+        guard !hierarchy.isEmpty else {
+            _ = try await notesService.createNote(
+                title: dateFallbackTitle(for: now),
+                body: transcript,
+                in: nil
+            )
+            return
+        }
+
+        // Determine text for classification: summarize if transcript exceeds budget
+        let wordCount = transcript.split(separator: " ").count
+        let needsSummarization = wordCount > contextBudget.availableForContent
+        let classificationText: String
+        let summary: String?
+        if needsSummarization {
+            let condensed = try await summarizer.summarize(
+                transcript: transcript,
+                contextBudget: contextBudget
+            )
+            classificationText = condensed
+            summary = condensed
+        } else {
+            classificationText = transcript
+            summary = nil
+        }
+
+        // Classify
+        let classification = try await TranscriptClassifier.classify(
+            transcript: classificationText,
+            hierarchy: hierarchy,
+            using: llmService,
+            now: now
+        )
+
+        // Resolve folder (nil for GENERAL NOTES or unrecognized paths)
+        let folder = classification.folderPath.flatMap { path in
+            hierarchy.first { $0.path == path }?.folder
+        }
+
+        // Determine note body based on mode
+        let body: String
+        switch mode {
+        case .routeOnly:
+            body = transcript
+        case .routeAndSummarize:
+            body = summary ?? transcript
+        }
+
+        // Create note
+        let creationResult = try await notesService.createNote(
+            title: classification.title,
+            body: body,
+            in: folder
+        )
+        if case .createdInDefaultFolder(let reason) = creationResult {
+            logger.warning("Note created in default folder: \(reason)")
+        }
+    }
+}
+
+// MARK: - Private helpers
+
+private func dateFallbackTitle(for date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "'Voice Memo' yyyy-MM-dd HH:mm"
+    formatter.timeZone = .gmt
+    return formatter.string(from: date)
 }
