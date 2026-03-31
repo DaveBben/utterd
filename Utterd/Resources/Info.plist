@@ -24,6 +24,8 @@
 	<string>15.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Utterd needs permission to create notes in Apple Notes.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Utterd uses speech recognition to transcribe your voice memos.</string>
 </dict>
