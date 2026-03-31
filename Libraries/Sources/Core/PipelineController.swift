@@ -4,8 +4,8 @@ import Foundation
 /// memo events into the store, and a `PipelineScheduler` that dispatches unprocessed
 /// records through `TranscriptionPipelineStage`.
 ///
-/// Stage 2 (LLM classification/routing) is not implemented here — `onResult` logs
-/// receipt and the lock stays held until stage 2 releases it.
+/// Stage 2 (LLM classification/routing) is wired in via `makeRoutingStage`. When nil,
+/// `onResult` logs receipt and the lock stays held (backward-compatible default).
 @MainActor
 public final class PipelineController {
     private let store: any MemoStore
@@ -13,6 +13,7 @@ public final class PipelineController {
     private let watcherStream: AsyncStream<VoiceMemoEvent>
     private let logger: any WatcherLogger
     private let clock: any Clock<Duration>
+    private let makeRoutingStage: ((@escaping @Sendable () async -> Void) -> NoteRoutingPipelineStage)?
 
     private var scheduler: PipelineScheduler?
     private var consumer: MemoConsumer?
@@ -23,23 +24,38 @@ public final class PipelineController {
         transcriptionService: any TranscriptionService,
         watcherStream: AsyncStream<VoiceMemoEvent>,
         logger: any WatcherLogger,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        makeRoutingStage: ((@escaping @Sendable () async -> Void) -> NoteRoutingPipelineStage)? = nil
     ) {
         self.store = store
         self.transcriptionService = transcriptionService
         self.watcherStream = watcherStream
         self.logger = logger
         self.clock = clock
+        self.makeRoutingStage = makeRoutingStage
     }
 
     public func start() async {
+        let onResultHandler: @Sendable (TranscriptionResult) async -> Void
+
+        if let factory = makeRoutingStage {
+            let routingStage = factory { [weak self] in
+                await MainActor.run { self?.scheduler?.releaseLock() }
+            }
+            onResultHandler = { result in
+                await routingStage.route(result)
+            }
+        } else {
+            onResultHandler = { [logger] result in
+                logger.info("Transcript emitted for \(result.fileURL.path), awaiting stage 2")
+            }
+        }
+
         let stage = TranscriptionPipelineStage(
             transcriptionService: transcriptionService,
             store: store,
             logger: logger,
-            onResult: { [logger] result in
-                logger.info("Transcript emitted for \(result.fileURL.path), awaiting stage 2")
-            }
+            onResult: onResultHandler
         )
 
         let scheduler = PipelineScheduler(
