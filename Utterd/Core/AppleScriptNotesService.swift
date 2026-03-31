@@ -91,6 +91,26 @@ struct AppleScriptNotesService: NotesService {
     }
 
     func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool {
-        fatalError("Not yet implemented")
+        let escapedTitle = title.appleScriptEscaped
+        let script: String
+        if let folder {
+            script = """
+                tell application "Notes"
+                    tell folder id "\(folder.id.appleScriptEscaped)"
+                        return (name of notes) contains "\(escapedTitle)"
+                    end tell
+                end tell
+                """
+        } else {
+            script = """
+                tell application "Notes"
+                    tell default account
+                        return (name of notes) contains "\(escapedTitle)"
+                    end tell
+                end tell
+                """
+        }
+        let result = try await executor.execute(script: script)
+        return result.trimmingCharacters(in: .whitespacesAndNewlines) == "true"
     }
 }

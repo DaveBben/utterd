@@ -263,14 +263,14 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing tests using `MockScriptExecutor`:
+1. [x] Write failing tests using `MockScriptExecutor`:
    - Test: `noteExists(title: "X", in: folder)` returns `true` when mock returns `"true"` (AC-03.1)
    - Test: `noteExists(title: "X", in: folder)` returns `false` when mock returns `"false"` (AC-03.2)
    - Test: `noteExists(title: "X", in: nil)` constructs script targeting default folder
    - Test: title with special characters is escaped in the script
-2. [ ] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
-3. [ ] Implement `noteExists(title:in:)`: construct AppleScript that checks if a note with the given name exists in the specified folder (by ID, or default folder if nil). Parse script output as boolean
-4. [ ] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+2. [x] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+3. [x] Implement `noteExists(title:in:)`: construct AppleScript that checks if a note with the given name exists in the specified folder (by ID, or default folder if nil). Parse script output as boolean
+4. [x] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
 
 **Acceptance Criteria:**
 
