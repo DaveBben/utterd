@@ -42,13 +42,16 @@ public struct TranscriptClassifier {
         hierarchy: [FolderHierarchyEntry],
         now: Date
     ) -> NoteClassificationResult {
-        let lines = response.split(separator: "\n", omittingEmptySubsequences: false).map { String($0) }
+        let lines = response
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
 
-        let rawFolder = lines.first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
-        let rawTitle = lines.dropFirst().first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        let rawFolder = lines.first ?? ""
+        let rawTitle = lines.dropFirst().first ?? ""
 
         let folderPath = matchFolder(rawFolder, in: hierarchy)
-        let title = rawTitle.isEmpty ? fallbackTitle(for: now) : rawTitle
+        let title = rawTitle.isEmpty ? dateFallbackTitle(for: now) : rawTitle
 
         return NoteClassificationResult(folderPath: folderPath, title: title)
     }
@@ -60,10 +63,4 @@ public struct TranscriptClassifier {
         return hierarchy.first { $0.path.lowercased() == normalized }?.path
     }
 
-    private static func fallbackTitle(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "'Voice Memo' yyyy-MM-dd HH:mm"
-        formatter.timeZone = .gmt
-        return formatter.string(from: date)
-    }
 }

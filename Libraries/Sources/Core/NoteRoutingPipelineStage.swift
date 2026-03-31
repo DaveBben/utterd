@@ -46,7 +46,11 @@ public final class NoteRoutingPipelineStage: Sendable {
 
         // Cleanup always runs regardless of success or failure — not a defer because
         // defer cannot contain await in Swift.
-        try? await store.markProcessed(fileURL: fileURL, date: now)
+        do {
+            try await store.markProcessed(fileURL: fileURL, date: now)
+        } catch {
+            logger.error("NoteRoutingPipelineStage: failed to mark processed \(fileURL.lastPathComponent): \(error)")
+        }
         await onComplete()
     }
 
@@ -113,9 +117,16 @@ public final class NoteRoutingPipelineStage: Sendable {
             body = summary ?? transcript
         }
 
+        // Sanitize the LLM-derived title: cap length, strip control characters
+        let sanitizedTitle: String = {
+            let truncated = String(classification.title.prefix(100))
+                .filter { !$0.isNewline && $0 != "\0" && $0 != "\t" }
+            return truncated.isEmpty ? dateFallbackTitle(for: now) : truncated
+        }()
+
         // Create note
         let creationResult = try await notesService.createNote(
-            title: classification.title,
+            title: sanitizedTitle,
             body: body,
             in: folder
         )
@@ -125,11 +136,3 @@ public final class NoteRoutingPipelineStage: Sendable {
     }
 }
 
-// MARK: - Private helpers
-
-private func dateFallbackTitle(for date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "'Voice Memo' yyyy-MM-dd HH:mm"
-    formatter.timeZone = .gmt
-    return formatter.string(from: date)
-}
