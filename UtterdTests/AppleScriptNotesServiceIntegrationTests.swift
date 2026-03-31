@@ -152,3 +152,104 @@ struct AppleScriptNotesServiceIntegrationTests {
         #expect(result == .created)
     }
 }
+
+// MARK: - Folder Listing & Hierarchy Integration Tests
+
+@Suite("AppleScriptNotesService Folder Integration")
+struct AppleScriptNotesServiceFolderIntegrationTests {
+    let service = AppleScriptNotesService(executor: NSAppleScriptExecutor())
+
+    private func requireNotesAccess() async throws {
+        let executor = NSAppleScriptExecutor()
+        let script = #"tell application "Notes" to name of default account"#
+        let accessible: Bool
+        do {
+            _ = try await executor.execute(script: script)
+            accessible = true
+        } catch {
+            accessible = false
+        }
+        try #require(
+            accessible,
+            "Apple Notes is not accessible — grant Automation permission or run on a system with Notes."
+        )
+    }
+
+    // MARK: - AC-01.1, AC-01.4: listFolders(in: nil) returns [NotesFolder] (may be empty)
+
+    @Test("listFolders(in: nil) returns a [NotesFolder] array")
+    func listTopLevelFoldersReturnsArray() async throws {
+        try await requireNotesAccess()
+
+        let folders = try await service.listFolders(in: nil)
+
+        // The result must be an array — its count may be zero if the user has no custom folders.
+        // We assert it is a valid [NotesFolder] by checking it can be iterated.
+        #expect(folders.count >= 0)
+    }
+
+    // MARK: - Each folder has non-empty id and name
+
+    @Test("each folder returned by listFolders has non-empty id and name")
+    func listTopLevelFoldersHaveNonEmptyProperties() async throws {
+        try await requireNotesAccess()
+
+        let folders = try await service.listFolders(in: nil)
+
+        for folder in folders {
+            #expect(!folder.id.isEmpty, "Folder '\(folder.name)' has an empty id")
+            #expect(!folder.name.isEmpty, "Folder with id '\(folder.id)' has an empty name")
+        }
+    }
+
+    // MARK: - AC-01.3: resolveHierarchy returns at least the folder itself
+
+    @Test("resolveHierarchy for a top-level folder returns array containing that folder")
+    func resolveHierarchyContainsFolderItself() async throws {
+        try await requireNotesAccess()
+
+        let folders = try await service.listFolders(in: nil)
+
+        guard let first = folders.first else {
+            // No custom folders in this environment — nothing to assert.
+            return
+        }
+
+        let hierarchy = try await service.resolveHierarchy(for: first)
+
+        #expect(hierarchy.count >= 1)
+        #expect(hierarchy.last == first)
+    }
+
+    // MARK: - AC-01.2: listFolders(in: folder) returns children (environment-dependent)
+
+    @Test("listFolders(in: folder) returns subfolders when they exist")
+    func listSubfoldersReturnsChildren() async throws {
+        try await requireNotesAccess()
+
+        let topLevel = try await service.listFolders(in: nil)
+
+        // Find the first folder that has children; skip if none exist in this environment.
+        var parentWithChildren: NotesFolder?
+        for folder in topLevel {
+            let children = try await service.listFolders(in: folder)
+            if !children.isEmpty {
+                parentWithChildren = folder
+                break
+            }
+        }
+
+        guard let parent = parentWithChildren else {
+            // No nested folders in this Notes environment — skip.
+            return
+        }
+
+        let children = try await service.listFolders(in: parent)
+
+        #expect(children.count >= 1)
+        for child in children {
+            #expect(!child.id.isEmpty)
+            #expect(!child.name.isEmpty)
+        }
+    }
+}

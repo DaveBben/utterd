@@ -397,14 +397,14 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing integration tests (reuse `requireNotesAccess()` guard from Task 6):
+1. [x] Write failing integration tests (reuse `requireNotesAccess()` guard from Task 6):
    - Test: `listFolders(in: nil)` returns a `[NotesFolder]` array (may be empty — assert type and shape) (AC-01.1, AC-01.4)
    - Test: each returned folder has non-empty `id` and non-empty `name`
    - Test: if folders are returned, `resolveHierarchy` for the first folder returns at least a single-element array containing that folder
    - Test: if a folder has subfolders, `listFolders(in: folder)` returns children (environment-dependent — skip if no nested folders found)
-2. [ ] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
-3. [ ] Wire tests using the real `AppleScriptNotesService` with `NSAppleScriptExecutor`
-4. [ ] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+2. [x] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+3. [x] Wire tests using the real `AppleScriptNotesService` with `NSAppleScriptExecutor`
+4. [x] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
 
 **Acceptance Criteria:**
 
