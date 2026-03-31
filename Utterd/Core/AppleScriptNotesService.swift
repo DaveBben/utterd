@@ -42,7 +42,52 @@ struct AppleScriptNotesService: NotesService {
     }
 
     func createNote(title: String, body: String, in folder: NotesFolder?) async throws -> NoteCreationResult {
-        fatalError("Not yet implemented")
+        let escapedTitle = title.appleScriptEscaped
+        let escapedBody = body.appleScriptEscaped
+
+        if let folder {
+            let folderExists = try await checkFolderExists(id: folder.id)
+            if folderExists {
+                let script = """
+                    tell application "Notes"
+                        set targetFolder to folder id "\(folder.id.appleScriptEscaped)"
+                        make new note at targetFolder with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
+                    end tell
+                    """
+                _ = try await executor.execute(script: script)
+                return .created
+            } else {
+                try await createNoteInDefaultAccount(title: escapedTitle, body: escapedBody)
+                return .createdInDefaultFolder(reason: "Folder no longer exists")
+            }
+        } else {
+            try await createNoteInDefaultAccount(title: escapedTitle, body: escapedBody)
+            return .created
+        }
+    }
+
+    private func checkFolderExists(id: String) async throws -> Bool {
+        let script = """
+            tell application "Notes"
+                try
+                    set f to folder id "\(id.appleScriptEscaped)"
+                    return "found"
+                on error
+                    return "not found"
+                end try
+            end tell
+            """
+        let result = try await executor.execute(script: script)
+        return result.trimmingCharacters(in: .whitespacesAndNewlines) != "not found"
+    }
+
+    private func createNoteInDefaultAccount(title: String, body: String) async throws {
+        let script = """
+            tell application "Notes"
+                make new note at default account with properties {name:"\(title)", body:"\(body)"}
+            end tell
+            """
+        _ = try await executor.execute(script: script)
     }
 
     func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool {

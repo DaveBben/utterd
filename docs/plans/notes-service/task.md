@@ -217,7 +217,7 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Write failing tests using `MockScriptExecutor` injected into `AppleScriptNotesService`:
+1. [x] Write failing tests using `MockScriptExecutor` injected into `AppleScriptNotesService`:
    - Test: `createNote(title:body:in: nil)` constructs script targeting default folder, returns `.created` (AC-02.2)
    - Test: `createNote` with folder reference constructs script using folder's `id` (AC-02.1)
    - Test: `createNote` with two folders having same name but different IDs — script uses the specific folder's `id`, not the name (AC-02.6)
@@ -225,10 +225,10 @@ None — all decisions resolved during planning.
    - Test: `createNote` when executor throws `automationPermissionDenied` → error propagated (AC-02.5)
    - Test: `createNote` with empty body constructs valid script (edge case)
    - Test: interpolated strings in script are escaped — title with quotes appears escaped in `executeCalls`
-2. [ ] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
-3. [ ] Implement `createNote(title:body:in:)`: construct AppleScript using `tell application "Notes"` to `make new note` with escaped `name` and `body`. When folder is nil, create in default folder of default account. When folder is provided, target by folder ID
-4. [ ] Implement folder-existence check: before creating in a specified folder, run a short script to verify the folder ID exists. If not found, create in default folder and return `.createdInDefaultFolder(reason: "Folder no longer exists")`
-5. [ ] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+2. [x] Run tests to verify they fail: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
+3. [x] Implement `createNote(title:body:in:)`: construct AppleScript using `tell application "Notes"` to `make new note` with escaped `name` and `body`. When folder is nil, create in default folder of default account. When folder is provided, target by folder ID
+4. [x] Implement folder-existence check: before creating in a specified folder, run a short script to verify the folder ID exists. If not found, create in default folder and return `.createdInDefaultFolder(reason: "Folder no longer exists")`
+5. [x] Run tests to verify they pass: `xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -30`
 
 **Acceptance Criteria:**
 
