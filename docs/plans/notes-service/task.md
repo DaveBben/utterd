@@ -2,7 +2,7 @@
 
 **Plan**: [docs/plans/notes-service/plan.md](plan.md)
 **Date**: 2026-03-30
-**Status**: Approved
+**Status**: In Progress
 
 ---
 
@@ -80,15 +80,15 @@ None — all decisions resolved during planning.
 
 **Steps:**
 
-1. [ ] Define `NotesFolder` struct in `NotesFolder.swift`: public, Sendable, with `id: String`, `name: String`, `containerID: String?` (nil = top-level). Implement `Equatable` and `Hashable` manually — equality and hashing based on `id` only (AC-01.7)
-2. [ ] Define `NoteCreationResult` enum in `NoteCreationResult.swift`: public, Sendable, with cases `.created` and `.createdInDefaultFolder(reason: String)`
-3. [ ] Define `NotesServiceError` enum in `NotesService.swift`: public, Sendable, conforming to `Error`, with cases `notesNotAccessible(String)`, `automationPermissionDenied`, `folderNotFound(String)`, `scriptExecutionFailed(String)`
-4. [ ] Define `NotesService` protocol in `NotesService.swift`: public, Sendable, with methods:
+1. [x] Define `NotesFolder` struct in `NotesFolder.swift`: public, Sendable, with `id: String`, `name: String`, `containerID: String?` (nil = top-level). Implement `Equatable` and `Hashable` manually — equality and hashing based on `id` only (AC-01.7)
+2. [x] Define `NoteCreationResult` enum in `NoteCreationResult.swift`: public, Sendable, with cases `.created` and `.createdInDefaultFolder(reason: String)`
+3. [x] Define `NotesServiceError` enum in `NotesService.swift`: public, Sendable, conforming to `Error`, with cases `notesNotAccessible(String)`, `automationPermissionDenied`, `folderNotFound(String)`, `scriptExecutionFailed(String)`
+4. [x] Define `NotesService` protocol in `NotesService.swift`: public, Sendable, with methods:
    - `func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder]` (nil = top-level)
    - `func resolveHierarchy(for folder: NotesFolder) async throws -> [NotesFolder]` (root-to-leaf)
    - `func createNote(title: String, body: String, in folder: NotesFolder?) async throws -> NoteCreationResult` (nil = default folder)
    - `func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool` (nil = default folder, test verification)
-5. [ ] Verify the package compiles: `cd Libraries && swift build </dev/null 2>&1`
+5. [x] Verify the package compiles: `cd Libraries && swift build </dev/null 2>&1`
 
 **Acceptance Criteria:**
 
