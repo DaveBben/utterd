@@ -9,11 +9,17 @@ final class MockNotesService: NotesService, @unchecked Sendable {
     nonisolated(unsafe) var listFoldersResult: [NotesFolder] = []
     nonisolated(unsafe) var listFoldersError: Error?
     nonisolated(unsafe) var listFoldersCalls: [NotesFolder?] = []
+    /// Keyed by parent folder ID; nil key matches root-level calls (`parent == nil`).
+    /// When a key is present its value is returned; otherwise falls back to `listFoldersResult`.
+    nonisolated(unsafe) var listFoldersByParent: [String?: [NotesFolder]] = [:]
 
     func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder] {
         listFoldersCalls.append(parent)
         if let error = listFoldersError {
             throw error
+        }
+        if let folders = listFoldersByParent[parent?.id] {
+            return folders
         }
         return listFoldersResult
     }

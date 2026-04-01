@@ -165,6 +165,149 @@ struct PipelineControllerTests {
         #expect(logger.infos.contains { $0.contains("awaiting stage 2") })
     }
 
+    // MARK: - Stage 2 wiring with routing stage factory
+
+    @Test func routingStageFactoryReceivesResultAndReleasesLock() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fileURL = try makeRealFile(in: dir)
+        let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
+
+        let store = MockMemoStore()
+        await store.setOldestUnprocessed(record)
+
+        let service = MockTranscriptionService()
+        service.result = TranscriptionResult(transcript: "buy milk", fileURL: fileURL)
+
+        let logger = MockWatcherLogger()
+
+        let notesService = MockNotesService()
+        let llmService = MockLLMService()
+        // LLM returns a two-line response: folder + title
+        llmService.result = "GENERAL NOTES\nBuy Milk"
+        let summarizer = MockTranscriptSummarizer()
+
+        let controller = PipelineController(
+            store: store,
+            transcriptionService: service,
+            watcherStream: makeEmptyStream(),
+            logger: logger,
+            clock: ImmediateClock(),
+            makeRoutingStage: { onComplete in
+                NoteRoutingPipelineStage(
+                    notesService: notesService,
+                    llmService: llmService,
+                    summarizer: summarizer,
+                    store: store,
+                    logger: logger,
+                    mode: .routeOnly,
+                    contextBudget: LLMContextBudget(totalWords: 3000, systemPromptOverhead: 200),
+                    onComplete: onComplete
+                )
+            }
+        )
+
+        await controller.start()
+        try await Task.sleep(for: .milliseconds(200))
+        controller.stop()
+
+        // Stage 2 should have routed — a note should have been created
+        #expect(notesService.createNoteCalls.count >= 1)
+        // The lock should have been released — no "awaiting stage 2" log
+        #expect(!logger.infos.contains { $0.contains("awaiting stage 2") })
+    }
+
+    @Test func nilRoutingStageFactoryLogsAwaitingStage2() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fileURL = try makeRealFile(in: dir)
+        let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
+
+        let store = MockMemoStore()
+        await store.setOldestUnprocessed(record)
+
+        let service = MockTranscriptionService()
+        service.result = TranscriptionResult(transcript: "reminder", fileURL: fileURL)
+
+        let logger = MockWatcherLogger()
+
+        let controller = PipelineController(
+            store: store,
+            transcriptionService: service,
+            watcherStream: makeEmptyStream(),
+            logger: logger,
+            clock: ImmediateClock(),
+            makeRoutingStage: nil
+        )
+
+        await controller.start()
+        try await Task.sleep(for: .milliseconds(100))
+        controller.stop()
+
+        #expect(logger.infos.contains { $0.contains("awaiting stage 2") })
+    }
+
+    @Test func endToEndStage1ToStage2MarksProcessedAndReleasesLock() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fileURL = try makeRealFile(in: dir)
+        let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
+
+        let store = MockMemoStore()
+        await store.setOldestUnprocessed(record)
+
+        let service = MockTranscriptionService()
+        service.result = TranscriptionResult(transcript: "pick up groceries", fileURL: fileURL)
+
+        let logger = MockWatcherLogger()
+
+        let notesService = MockNotesService()
+        let llmService = MockLLMService()
+        llmService.result = "GENERAL NOTES\nGrocery Reminder"
+        let summarizer = MockTranscriptSummarizer()
+
+        let controller = PipelineController(
+            store: store,
+            transcriptionService: service,
+            watcherStream: makeEmptyStream(),
+            logger: logger,
+            clock: ImmediateClock(),
+            makeRoutingStage: { onComplete in
+                NoteRoutingPipelineStage(
+                    notesService: notesService,
+                    llmService: llmService,
+                    summarizer: summarizer,
+                    store: store,
+                    logger: logger,
+                    mode: .routeOnly,
+                    contextBudget: LLMContextBudget(totalWords: 3000, systemPromptOverhead: 200),
+                    onComplete: onComplete
+                )
+            }
+        )
+
+        await controller.start()
+        try await Task.sleep(for: .milliseconds(300))
+        controller.stop()
+
+        // Memo was marked processed by Stage 2
+        let markProcessedCalls = await store.markProcessedCalls
+        #expect(markProcessedCalls.count >= 1)
+        #expect(markProcessedCalls.first?.fileURL == fileURL)
+
+        // Note was created
+        #expect(notesService.createNoteCalls.count >= 1)
+
+        // Lock was released — scheduler cycled again (transcribe called more than once,
+        // since oldestUnprocessed still returns the same record after markProcessed)
+        // OR the lock was released without a second transcription if the test window was short.
+        // At minimum, no "awaiting stage 2" message should appear.
+        #expect(!logger.infos.contains { $0.contains("awaiting stage 2") })
+    }
+
     // MARK: - stop() stops scheduler and consumer
 
     @Test func stopHaltsScheduler() async throws {
