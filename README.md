@@ -1,6 +1,6 @@
 # Utterd
 
-A macOS daemon that routes voice memos to Reminders, Calendar, and Notes
+A macOS daemon that turns voice memos into Apple Notes — automatically transcribed, optionally summarized, filed into the right folder
 
 ## Requirements
 
