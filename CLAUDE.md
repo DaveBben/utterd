@@ -1,10 +1,10 @@
 ## Project Identity
 
-A macOS menu bar daemon that automatically triages voice memos into Reminders, Calendar, and Notes.
-It monitors the iCloud Voice Memos sync directory, transcribes audio via on-device speech-to-text
-(macOS 26+), classifies transcripts via a language model (on-device or remote), and creates items
-in the destination apps — no manual intervention after setup. Built for a single productivity-minded
-user who wants voice capture as a reliable front door to their trusted systems.
+A macOS menu bar daemon that automatically turns voice memos into Apple Notes.
+It monitors the iCloud Voice Memos sync directory, transcribes audio on-device
+(macOS 26+), and optionally uses a language model to pick the right Notes folder
+and summarize the content — no manual intervention after setup. Built for a single
+user who wants frictionless voice capture without thinking about where things go.
 
 ## Tech Stack and Codebase Map
 
