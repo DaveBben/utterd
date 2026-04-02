@@ -4,6 +4,7 @@ import SwiftUI
 struct UtterdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var appState = AppState()
+    @State private var userSettings = UserSettings()
 
     var body: some Scene {
         // Wire appState to delegate before applicationDidFinishLaunching fires.
@@ -15,6 +16,11 @@ struct UtterdApp: App {
         )) {
             MenuBarMenuContent()
                 .environment(appState)
+        }
+
+        Settings {
+            SettingsView()
+                .environment(userSettings)
         }
     }
 }

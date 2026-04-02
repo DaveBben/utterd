@@ -17,6 +17,13 @@ struct MenuBarMenuContent: View {
 
         Divider()
 
+        Button(MenuBarStrings.settingsButton) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            NSApp.activate()
+        }
+
+        Divider()
+
         Button(MenuBarStrings.quitButton) {
             NSApplication.shared.terminate(nil)
         }
