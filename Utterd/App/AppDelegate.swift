@@ -85,6 +85,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let store = JSONMemoStore(fileURL: storeURL)
 
+        Task { [weak self] in
+            let record = await store.mostRecentlyProcessed()
+            await MainActor.run {
+                self?.appState?.lastProcessedDate = record?.dateProcessed
+            }
+        }
+
         let monitor = FSEventsDirectoryMonitor(directoryURL: directoryURL)
         let watcher = VoiceMemoWatcher(
             directoryURL: directoryURL,

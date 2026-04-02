@@ -14,6 +14,7 @@ struct UtterdApp: App {
             set: { appState.permissionResolved = $0 }
         )) {
             MenuBarMenuContent()
+                .environment(appState)
         }
     }
 }
