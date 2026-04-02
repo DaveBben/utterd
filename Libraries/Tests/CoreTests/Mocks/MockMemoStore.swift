@@ -6,6 +6,8 @@ actor MockMemoStore: MemoStore {
     var markProcessedCalls: [(fileURL: URL, date: Date)] = []
     var insertError: Error?
     var oldestUnprocessedResult: MemoRecord?
+    var mostRecentlyProcessedResult: MemoRecord?
+    var mostRecentlyProcessedCallCount: Int = 0
 
     func insert(_ record: MemoRecord) async throws {
         if let error = insertError {
@@ -20,6 +22,11 @@ actor MockMemoStore: MemoStore {
 
     func oldestUnprocessed() async -> MemoRecord? {
         oldestUnprocessedResult
+    }
+
+    func mostRecentlyProcessed() async -> MemoRecord? {
+        mostRecentlyProcessedCallCount += 1
+        return mostRecentlyProcessedResult
     }
 
     func markProcessed(fileURL: URL, date: Date) async throws {

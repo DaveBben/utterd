@@ -4,6 +4,32 @@ import Foundation
 /// from the provided hierarchy (or fall back to "GENERAL NOTES").
 public struct TranscriptClassifier {
 
+    /// Template for custom prompts. Mirrors the built-in prompt structure but uses
+    /// `{notes_folders}` as a placeholder for the dynamic folder list.
+    public static let defaultCustomPrompt = """
+        Pick the best folder for a voice memo. Reply with exactly two lines: the folder path, then a short title.
+
+        Folders:
+        {notes_folders}
+        - GENERAL NOTES
+
+        Examples:
+
+        Transcript: "I had this idea for a fitness app that uses your camera to count reps"
+        Ideas.App Ideas
+        Fitness Rep Counter App
+
+        Transcript: "In the Monday sync we went over the launch timeline with the team"
+        Work.Meetings
+        Monday Launch Timeline Sync
+
+        Transcript: "Pick up the best folder that matches the topic. If nothing fits, use GENERAL NOTES"
+        GENERAL NOTES
+        Folder Selection Reminder
+
+        Now classify this transcript. Two lines only: folder path, then title.
+        """
+
     /// Classifies the transcript and returns a folder path (or nil for general)
     /// plus a short title. The `now` date is used only to generate fallback titles
     /// when the LLM response contains no usable title.

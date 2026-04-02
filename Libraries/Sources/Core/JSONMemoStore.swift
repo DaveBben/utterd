@@ -42,6 +42,12 @@ public actor JSONMemoStore: MemoStore {
             .min(by: { $0.dateCreated < $1.dateCreated })
     }
 
+    public func mostRecentlyProcessed() -> MemoRecord? {
+        records
+            .filter { $0.dateProcessed != nil }
+            .max(by: { $0.dateProcessed! < $1.dateProcessed! })
+    }
+
     public func markProcessed(fileURL url: URL, date: Date) throws {
         let normalized = url.standardizedFileURL
         guard let index = records.firstIndex(where: { $0.fileURL.standardizedFileURL == normalized }) else {
