@@ -131,6 +131,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     summarizer: summarizer,
                     store: store,
                     logger: logger,
+                    // routeOnly: note body is the full transcript.
+                    // routeAndSummarize available but disabled until a user preference toggle exists.
                     mode: .routeOnly,
                     contextBudget: contextBudget,
                     onComplete: onComplete

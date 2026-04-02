@@ -157,8 +157,61 @@ struct TranscriptClassifierTests {
         #expect(call.systemPrompt.contains("finance.home"))
         #expect(call.systemPrompt.contains("personal"))
         #expect(call.systemPrompt.contains("GENERAL NOTES"))
-        // Instructs line-separated format
-        #expect(call.systemPrompt.contains("line 1") || call.systemPrompt.contains("first line"))
-        #expect(call.systemPrompt.contains("line 2") || call.systemPrompt.contains("second line"))
+        // Contains few-shot examples
+        #expect(call.systemPrompt.contains("Transcript:"))
+        #expect(call.systemPrompt.contains("Two lines only") || call.systemPrompt.contains("two lines"))
+    }
+
+    // MARK: - Label stripping
+
+    @Test
+    func folderPrefixStripped() async throws {
+        let llm = MockLLMService()
+        llm.result = "Folder: finance.home\nTitle: Budget Review"
+        let hierarchy = makeHierarchy(["finance", "finance.home", "personal"])
+        let now = makeDate(year: 2026, month: 3, day: 31, hour: 14, minute: 30)
+
+        let result = try await TranscriptClassifier.classify(
+            transcript: "Some thought",
+            hierarchy: hierarchy,
+            using: llm,
+            now: now
+        )
+
+        #expect(result == NoteClassificationResult(folderPath: "finance.home", title: "Budget Review"))
+    }
+
+    @Test
+    func pathPrefixStripped() async throws {
+        let llm = MockLLMService()
+        llm.result = "Path: personal\nTitle: Quick note"
+        let hierarchy = makeHierarchy(["finance", "finance.home", "personal"])
+        let now = makeDate(year: 2026, month: 3, day: 31, hour: 14, minute: 30)
+
+        let result = try await TranscriptClassifier.classify(
+            transcript: "Some thought",
+            hierarchy: hierarchy,
+            using: llm,
+            now: now
+        )
+
+        #expect(result == NoteClassificationResult(folderPath: "personal", title: "Quick note"))
+    }
+
+    @Test
+    func linePrefixStripped() async throws {
+        let llm = MockLLMService()
+        llm.result = "Line 1: GENERAL NOTES\nLine 2: Misc"
+        let hierarchy = makeHierarchy(["finance", "finance.home", "personal"])
+        let now = makeDate(year: 2026, month: 3, day: 31, hour: 14, minute: 30)
+
+        let result = try await TranscriptClassifier.classify(
+            transcript: "Some thought",
+            hierarchy: hierarchy,
+            using: llm,
+            now: now
+        )
+
+        #expect(result == NoteClassificationResult(folderPath: nil, title: "Misc"))
     }
 }

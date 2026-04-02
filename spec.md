@@ -51,19 +51,18 @@ Utterd is a macOS menu bar daemon that automatically turns voice memos into Appl
 ## Architecture Summary
 
 ```
-iCloud Sync ──▶ [File Watcher] ──▶ [Transcribe] ──▶ [LLM: route + summarize] ──▶ Apple Notes
-  (.m4a files)                        (on-device)         (optional)              (AppleScript)
-                                                      ├─ On-device (Foundation Model, macOS 26+)
-                                                      └─ Remote fallback (OpenAI-compatible)
+iCloud Sync ──▶ [File Watcher] ──▶ [Transcribe] ──▶ [LLM: classify] ──▶ Apple Notes
+  (.m4a files)                        (on-device)      (on-device)        (AppleScript)
+                                                    On-device Foundation Model (macOS 26+)
 ```
 
 **Key design patterns:**
-- Sequential pipes-and-filters pipeline — detection → copy → transcription → (optional) folder classification + summarization → note creation → dedup → cleanup. Each stage is an isolated function with typed inputs/outputs
-- Protocol-based LLM provider abstraction — a Swift protocol defines the LLM interface; concrete types implement on-device and remote variants
+- Sequential pipes-and-filters pipeline — detection → copy → transcription → folder classification → note creation → dedup → cleanup. Each stage is an isolated function with typed inputs/outputs
+- Protocol-based LLM provider abstraction — a Swift protocol defines the LLM interface; the on-device Foundation Model is the only concrete provider today. The protocol enables adding a remote variant later
 - Exactly-once processing via persistent dedup store — checked before processing, written after successful creation
 
 **Data flow:**
-A new .m4a file arrives in the watched directory → copied to a temp location → audio transcribed via on-device speech-to-text → if an LLM provider is available, transcript is classified into a top-level Apple Notes folder and optionally summarized → note created in Apple Notes via AppleScript → file identity recorded in dedup store → temp copy cleaned up. When no LLM is available, notes are created in the default folder with the raw transcript.
+A new .m4a file arrives in the watched directory → copied to a temp location → audio transcribed via on-device speech-to-text → transcript classified into a Notes folder by on-device LLM → note created in Apple Notes via AppleScript with full transcript as body → file identity recorded in dedup store → temp copy cleaned up. On macOS 15–25, the pipeline does not start; memos are not processed until the user upgrades to macOS 26+.
 
 ---
 
@@ -154,9 +153,7 @@ class BadModel: ObservableObject {
 |---------|---------|------|------|
 | iCloud Voice Memos sync directory | Source of .m4a voice memo files | Disk access permission | `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` |
 | macOS Foundation Model (macOS 26+) | On-device LLM for folder classification and optional summarization | None (on-device) | Apple platform docs |
-| Remote LLM (OpenAI-compatible) | Fallback LLM provider | API key in Keychain | User-configured endpoint URL |
 | AppleScript (NSAppleScript) | Notes item creation with folder targeting | Automation permission | Apple AppleScript docs |
-| System Keychain | Secure credential storage for remote LLM | Keychain Services API | Apple Security framework docs |
 | FSEvents (CoreServices) | File system monitoring for new voice memos | Disk access permission | Apple FSEvents docs |
 
 ---

@@ -46,6 +46,7 @@ public final class TranscriptionPipelineStage: Sendable {
             let serviceResult = try await transcriptionService.transcribe(fileURL: tempURL)
             try? FileManager.default.removeItem(at: tempURL)
             let result = TranscriptionResult(transcript: serviceResult.transcript, fileURL: record.fileURL)
+            logger.info("Transcription complete for \(record.fileURL.lastPathComponent): \(result.transcript.count) characters")
             await onResult(result)
             return true
         } catch {

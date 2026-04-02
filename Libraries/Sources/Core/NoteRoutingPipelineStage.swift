@@ -102,7 +102,6 @@ public final class NoteRoutingPipelineStage: Sendable {
             using: llmService,
             now: now
         )
-
         // Resolve folder (nil for GENERAL NOTES or unrecognized paths)
         let folder = classification.folderPath.flatMap { path in
             hierarchy.first { $0.path == path }?.folder
@@ -123,6 +122,9 @@ public final class NoteRoutingPipelineStage: Sendable {
                 .filter { !$0.isNewline && $0 != "\0" && $0 != "\t" }
             return truncated.isEmpty ? dateFallbackTitle(for: now) : truncated
         }()
+
+        logger.info("LLM classification — folder: \(classification.folderPath ?? "GENERAL NOTES"), title: \(sanitizedTitle)")
+        logger.info("Creating note '\(sanitizedTitle)' in \(folder?.name ?? "default folder") with \(body.count) char body")
 
         // Create note
         let creationResult = try await notesService.createNote(

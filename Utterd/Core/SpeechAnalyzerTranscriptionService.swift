@@ -10,7 +10,11 @@ struct SpeechAnalyzerTranscriptionService: TranscriptionService {
         }
 
         let audioFile = try AVAudioFile(forReading: fileURL)
-        let transcriber = DictationTranscriber(locale: .current, preset: .longDictation)
+        // Locale.current can return a "fixed" composite locale (e.g. "en_US (fixed)")
+        // that SpeechAnalyzer doesn't recognize. Constructing a fresh Locale from the
+        // identifier strips the fixed qualifier and matches an allocated locale.
+        let locale = Locale(identifier: Locale.current.identifier)
+        let transcriber = DictationTranscriber(locale: locale, preset: .longDictation)
         let analyzer = try await SpeechAnalyzer(modules: [transcriber])
 
         async let transcriptFuture = transcriber.results.reduce("") { text, result in

@@ -26,7 +26,7 @@ private func requireNotesAccess() async throws {
     )
 }
 
-@Suite("AppleScriptNotesService Integration")
+@Suite("AppleScriptNotesService Integration", .tags(.integration))
 struct AppleScriptNotesServiceIntegrationTests {
     let service = AppleScriptNotesService(executor: NSAppleScriptExecutor())
 
@@ -155,7 +155,7 @@ struct AppleScriptNotesServiceIntegrationTests {
 
 // MARK: - Folder Listing & Hierarchy Integration Tests
 
-@Suite("AppleScriptNotesService Folder Integration")
+@Suite("AppleScriptNotesService Folder Integration", .tags(.integration))
 struct AppleScriptNotesServiceFolderIntegrationTests {
     let service = AppleScriptNotesService(executor: NSAppleScriptExecutor())
 

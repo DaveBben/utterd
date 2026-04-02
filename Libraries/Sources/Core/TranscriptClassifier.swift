@@ -23,17 +23,27 @@ public struct TranscriptClassifier {
     private static func buildSystemPrompt(hierarchy: [FolderHierarchyEntry]) -> String {
         let folderList = hierarchy.map { "- \($0.path)" }.joined(separator: "\n")
         return """
-        You are a note routing assistant. Given a voice memo transcript, choose the best folder for the note.
+        Pick the best folder for a voice memo. Reply with exactly two lines: the folder path, then a short title.
 
-        Available folders (dot notation):
+        Folders:
         \(folderList)
         - GENERAL NOTES
 
-        Respond with exactly two lines:
-        - line 1: the folder path from the list above (e.g. "finance.home"), or "GENERAL NOTES" if none fits
-        - line 2: a short descriptive title for the note (5 words or fewer)
+        Examples:
 
-        Do not include any other text.
+        Transcript: "I had this idea for a fitness app that uses your camera to count reps"
+        Ideas.App Ideas
+        Fitness Rep Counter App
+
+        Transcript: "In the Monday sync we went over the launch timeline with the team"
+        Work.Meetings
+        Monday Launch Timeline Sync
+
+        Transcript: "Pick up the best folder that matches the topic. If nothing fits, use GENERAL NOTES"
+        GENERAL NOTES
+        Folder Selection Reminder
+
+        Now classify this transcript. Two lines only: folder path, then title.
         """
     }
 
@@ -46,6 +56,7 @@ public struct TranscriptClassifier {
             .split(separator: "\n", omittingEmptySubsequences: false)
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+            .map { stripLabel($0) }
 
         let rawFolder = lines.first ?? ""
         let rawTitle = lines.dropFirst().first ?? ""
@@ -54,6 +65,16 @@ public struct TranscriptClassifier {
         let title = rawTitle.isEmpty ? dateFallbackTitle(for: now) : rawTitle
 
         return NoteClassificationResult(folderPath: folderPath, title: title)
+    }
+
+    /// Strips common prefixes the on-device model sometimes adds (e.g. "Folder: Ideas" → "Ideas").
+    private static func stripLabel(_ line: String) -> String {
+        for prefix in ["folder:", "title:", "line 1:", "line 2:", "path:"] {
+            if line.lowercased().hasPrefix(prefix) {
+                return String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return line
     }
 
     /// Returns the matching hierarchy path (original casing) or nil for GENERAL NOTES / unknown.
