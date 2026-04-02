@@ -7,10 +7,16 @@ enum PermissionGateAction {
 }
 
 @MainActor
-func evaluatePermissionGate(checker: PermissionChecker) -> PermissionGateAction {
-    checker.checkAccess()
-    return checker.hasVoiceMemoAccess ? .proceed : .showPermissionAlert
+func evaluatePermissionGate(fileSystem: FileSystemChecker) -> PermissionGateAction {
+    let url = voiceMemoDirectoryURL
+    // Attempt a directory listing to trigger TCC registration so Utterd
+    // appears in System Settings > Full Disk Access.
+    _ = fileSystem.contentsOfDirectory(at: url)
+    return fileSystem.isReadable(at: url) ? .proceed : .showPermissionAlert
 }
+
+let voiceMemoDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
+    .appendingPathComponent("Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings")
 
 @MainActor
 func handleOpenSystemSettings(
@@ -27,7 +33,7 @@ func handleOpenSystemSettings(
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Written once by UtterdApp.body before applicationDidFinishLaunching fires.
     var appState: AppState?
-    private lazy var permissionChecker = PermissionChecker(fileSystem: RealFileSystemChecker())
+    private let fileSystem: FileSystemChecker = RealFileSystemChecker()
 
     private var voiceMemoWatcher: VoiceMemoWatcher?
     private var pipelineController: PipelineController?
@@ -35,19 +41,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controllerTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Skip permission gate during unit tests to prevent alert from blocking test runner.
-        // Works with xcodebuild. Does not detect swift test CLI.
+        // Skip permission gate during unit tests.
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             return
         }
 
         assert(appState != nil, "appState must be wired by UtterdApp.body before applicationDidFinishLaunching")
 
-        // SwiftUI evaluates App.body (including MenuBarExtra scenes) BEFORE
-        // applicationDidFinishLaunching fires. The MenuBarExtra is conditionally
-        // included only when permissionResolved is true, preventing a "ghost icon"
-        // from appearing before the permission check completes.
-        let action = evaluatePermissionGate(checker: permissionChecker)
+        let action = evaluatePermissionGate(fileSystem: fileSystem)
         if action == .proceed {
             appState?.permissionResolved = true
             startPipeline()
@@ -62,8 +63,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Pipeline lifecycle
 
-    // ~3K words ≈ ~4K tokens for Apple's on-device Foundation Model.
-    // 200 words reserved for the system prompt (classifier instructions + folder hierarchy listing).
     private static let defaultContextBudget = LLMContextBudget(
         totalWords: 3000,
         systemPromptOverhead: 200,
@@ -72,16 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startPipeline() {
         guard #available(macOS 26, *) else {
-            // On macOS 15–25, transcription and LLM services are unavailable.
-            // Without a consumer, the watcher cannot persist detected memos, so
-            // there is nothing useful to run.
             OSLogWatcherLogger().warning("macOS 26+ required for transcription and LLM — pipeline not started")
             return
         }
 
         let logger = OSLogWatcherLogger()
         let fileSystem = RealFileSystemChecker()
-        let directoryURL = permissionChecker.voiceMemoDirectoryURL
+        let directoryURL = voiceMemoDirectoryURL
 
         guard let storeURL = storeFileURL(logger: logger) else {
             logger.error("Pipeline not started — cannot create data directory")
@@ -131,8 +127,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     summarizer: summarizer,
                     store: store,
                     logger: logger,
-                    // routeOnly: note body is the full transcript.
-                    // routeAndSummarize available but disabled until a user preference toggle exists.
                     mode: .routeOnly,
                     contextBudget: contextBudget,
                     onComplete: onComplete
@@ -142,8 +136,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func stopPipeline() {
-        // Stop producer (watcher) before consumer (controller) so the event
-        // stream finishes cleanly before the consumer is torn down.
         voiceMemoWatcher?.stop()
         watcherTask?.cancel()
         watcherTask = nil
@@ -152,10 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controllerTask = nil
     }
 
-    /// Returns the URL for the memo store JSON file in Application Support,
-    /// or nil if the directory cannot be created.
     private func storeFileURL(logger: OSLogWatcherLogger) -> URL? {
-        // Application Support always exists in userDomainMask on macOS.
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = appSupport.appendingPathComponent("Utterd", isDirectory: true)
         do {

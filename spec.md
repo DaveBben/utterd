@@ -7,7 +7,7 @@
 
 ## What This Project Does
 
-Utterd is a macOS menu bar daemon that automatically turns voice memos into Apple Notes. It monitors the iCloud Voice Memos sync directory, transcribes audio on-device (macOS 26+), and optionally uses a language model to pick the right Notes folder and summarize the content — no manual intervention after setup. Built for a single user who wants frictionless voice capture without thinking about where things go.
+Utterd is a macOS menu bar daemon that automatically turns voice memos into Apple Notes. It monitors the iCloud Voice Memos sync directory, transcribes audio on-device (macOS 26+), and uses a language model to pick the right Notes folder (summarization is supported but not yet enabled) — no manual intervention after setup. Built for a single user who wants frictionless voice capture without thinking about where things go.
 
 ---
 
@@ -21,7 +21,7 @@ Utterd is a macOS menu bar daemon that automatically turns voice memos into Appl
 
 - Ship a working end-to-end pipeline: voice memo file appears on disk → note shows up in the right Apple Notes folder within 5 minutes, zero manual steps
 - Every memo processed exactly once — no duplicates, no misses, even across restarts and duplicate file events
-- Privacy by default: on-device LLM (macOS 26+) as the primary provider; remote endpoint only as a configured fallback
+- Privacy by default: on-device LLM (macOS 26+) for all processing — no memo content leaves the machine
 - Eventually open-source the project — codebase must be clean, self-documenting, and easy for outside contributors to build and run
 
 ---
@@ -39,9 +39,9 @@ Utterd is a macOS menu bar daemon that automatically turns voice memos into Appl
 
 ## Non-Functional Requirements
 
-- **Performance**: End-to-end processing of a single memo completes in under 60 seconds, excluding network latency for remote LLM calls and iCloud sync time
-- **Privacy**: On-device LLM → no memo content leaves the machine. Remote LLM → user is explicitly informed that transcript text will be sent to the configured server
-- **Security**: If a remote LLM fallback is configured, credentials are stored in system Keychain only — never in plaintext config. LLM prompts must be hardened against injection from transcript content
+- **Performance**: End-to-end processing of a single memo completes in under 60 seconds, excluding iCloud sync time
+- **Privacy**: On-device LLM → no memo content leaves the machine
+- **Security**: LLM prompts must be hardened against injection from transcript content
 - **Persistence**: Deduplication store and failure log survive app restarts. Entries older than 90 days may be pruned automatically
 - **Failure thresholds**: Each memo attempted once. No automatic retry. 10+ consecutive failures → error state in status indicator
 - **Reliability**: App must run indefinitely without memory leaks or resource exhaustion. Must survive directory changes, LLM unavailability, and API failures without crashing
@@ -77,7 +77,7 @@ A new .m4a file arrives in the watched directory → copied to a temp location �
 | @Observable over ObservableObject | Per-property view invalidation, less boilerplate, modern Swift pattern | 2026-03-24 | ObservableObject + @Published — legacy pattern |
 | AppleScript for Notes | Only known mechanism for programmatic Notes access with folder targeting | 2026-03-24 | Scripting Bridge — rejected; NSAppleScript avoids generated bridge headers and works without App Store entitlements |
 | LLM for folder routing, not multi-app classification | Simpler prompt, fewer failure modes, graceful degradation (default folder when LLM unavailable) | 2026-04-01 | Multi-destination classification to Reminders/Calendar/Notes — rejected as over-engineered for single-user MVP |
-| Keychain for remote LLM credentials | macOS security standard — avoids plaintext secrets in config files | 2026-03-24 | Plaintext in YAML config — rejected for security |
+| Keychain for remote LLM credentials (deferred — no remote provider currently implemented) | macOS security standard — avoids plaintext secrets in config files | 2026-03-24 | Plaintext in YAML config — rejected for security |
 
 ---
 

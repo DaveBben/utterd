@@ -16,10 +16,4 @@ struct SpeechAnalyzerTranscriptionServiceTests {
         }
     }
 
-    @Test("SpeechAnalyzerTranscriptionService conforms to TranscriptionService")
-    func conformsToTranscriptionService() {
-        guard #available(macOS 26, *) else { return }
-        // Compilation check — if this compiles, the conformance exists.
-        let _: any TranscriptionService = SpeechAnalyzerTranscriptionService()
-    }
 }

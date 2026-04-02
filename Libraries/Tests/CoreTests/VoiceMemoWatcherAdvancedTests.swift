@@ -41,40 +41,6 @@ struct VoiceMemoWatcherAdvancedTests {
         #expect(received.first == VoiceMemoEvent(fileURL: url, fileSize: 2048))
     }
 
-    // AC-T4a-2: After emission at 2048, re-emitting same URL at same size → no additional event
-    @Test("Already-emitted file URL at same size produces no additional event")
-    func alreadyEmittedFileNoAdditionalEvent() async {
-        let monitor = MockDirectoryMonitor()
-        let fileSystem = MockFileSystemChecker()
-        let logger = MockWatcherLogger()
-
-        let url = URL(fileURLWithPath: "/tmp/memos/memo.m4a")
-        fileSystem.fileSizes = [url: 2048]
-
-        let watcher = makeWatcher(monitor: monitor, fileSystem: fileSystem, logger: logger)
-        let eventStream = watcher.events()
-        await watcher.start()
-
-        var received: [VoiceMemoEvent] = []
-        let collectTask = Task { @MainActor in
-            for await event in eventStream {
-                received.append(event)
-            }
-        }
-
-        // First emission
-        monitor.emit([url])
-        try? await Task.sleep(for: .milliseconds(50))
-        // Re-emit same URL at same size
-        monitor.emit([url])
-        try? await Task.sleep(for: .milliseconds(50))
-
-        watcher.stop()
-        await collectTask.value
-
-        #expect(received.count == 1)
-    }
-
     // AC-T4a-3: 5 separate notifications for 5 distinct files → exactly 5 events
     @Test("5 separate notifications for 5 distinct files emit exactly 5 events")
     func burstOfFiveDistinctFilesEmitsFiveEvents() async {

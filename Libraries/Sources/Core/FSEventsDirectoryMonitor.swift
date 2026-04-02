@@ -1,32 +1,21 @@
 import CoreServices
 import Foundation
 
-// Thread safety: mutable state is protected by `queue`. The `start()` and
-// `stop()` methods dispatch state mutations onto `queue` synchronously.
-// The FSEvents callback also runs on `queue`. @unchecked Sendable is correct
-// because all mutable access is serialized on a single dispatch queue.
+// @unchecked Sendable: all mutable state is serialized on `queue`.
 public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendable {
 
-    // FSEvents coalesces filesystem events within this window before delivery.
-    // 0.3s balances responsiveness (well within the 5s detection target, SC-5)
-    // with batching to avoid excessive callback invocations during burst iCloud syncs.
     private static let eventLatency: CFTimeInterval = 0.3
 
     private let directoryURL: URL
     private let queue: DispatchQueue
 
     private var eventStream: FSEventStreamRef?
-    // fileprivate so the file-scope C callback can access it.
-    // Must only be accessed from `queue`.
+    // fileprivate: accessed by the C callback. Must only be read/written from `queue`.
     fileprivate var continuation: AsyncStream<Set<URL>>.Continuation?
     private var isRunning = false
 
-    // Retained-self pointer kept alive while FSEventStream is active.
-    // Balanced by Unmanaged.release() in stopOnQueue().
-    // IMPORTANT: callers MUST call stop() before dropping all references.
-    // passRetained prevents deallocation while the stream is active, so
-    // deinit only fires after stop() has already been called (making the
-    // deinit call to stopOnQueue() a no-op safety net).
+    // passRetained prevents dealloc while the stream is active.
+    // Callers MUST call stop() before dropping all references.
     private var contextPointer: UnsafeMutableRawPointer?
 
     public init(directoryURL: URL) {
@@ -35,9 +24,6 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
     }
 
     deinit {
-        // Safety net — stopOnQueue() is a no-op if stop() was already called
-        // (which it must have been for deinit to fire, since passRetained
-        // prevents deallocation while the stream is active).
         stopOnQueue()
     }
 
@@ -48,7 +34,6 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
             throw DirectoryMonitorError.directoryNotFound(directoryURL)
         }
 
-        // Stop any existing stream before starting fresh.
         stop()
 
         let (stream, cont) = AsyncStream<Set<URL>>.makeStream(
@@ -57,7 +42,6 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
 
         let pathsToWatch = [directoryURL.path] as CFArray
         var context = FSEventStreamContext()
-        // passRetained keeps self alive while the stream is active.
         let retained = Unmanaged.passRetained(self)
         let ptr = retained.toOpaque()
         context.info = ptr
@@ -83,9 +67,7 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
             throw DirectoryMonitorError.streamCreationFailed
         }
 
-        // Commit state and activate the stream atomically on the queue.
-        // Both must happen inside the same queue.sync to prevent a concurrent
-        // stop() from releasing the stream between state commit and activation.
+        // Atomic on queue to prevent concurrent stop() from interleaving.
         queue.sync {
             self.continuation = cont
             self.contextPointer = ptr

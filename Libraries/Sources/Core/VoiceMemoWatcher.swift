@@ -13,13 +13,8 @@ public final class VoiceMemoWatcher {
     private let logger: any WatcherLogger
     private let clock: any Clock<Duration>
 
-    // Tracks files for which an event has been emitted — permanently deduplicates.
     private var emittedPaths: Set<URL> = []
-
-    // Continuation registry — each events() call gets its own entry.
     private var continuations: [UUID: AsyncStream<VoiceMemoEvent>.Continuation] = [:]
-
-    // The running monitor loop task — cancelled by stop().
     private var monitorTask: Task<Void, Never>?
 
     public init(
@@ -36,28 +31,22 @@ public final class VoiceMemoWatcher {
         self.clock = clock
     }
 
-    /// Begins monitoring. Returns promptly — the monitoring loop runs as a background task.
-    /// Logs a warning (missing folder) or error (no read permission) before returning.
+    /// Begins monitoring. The monitoring loop runs as a background task.
     /// If the folder is unavailable, polls with exponential backoff until it appears.
     public func start() async {
-        // Cancel any existing monitoring task to prevent orphaned loops.
         if monitorTask != nil {
             stop()
         }
 
-        // Check initial state synchronously so tests can assert on log messages
-        // immediately after start() returns.
         if !fileSystem.directoryExists(at: directoryURL) {
             logger.warning("Watched folder is missing: \(directoryURL.path)")
         } else if !fileSystem.isReadable(at: directoryURL) {
             logger.error("Watched folder is not readable (permission denied): \(directoryURL.path)")
         }
 
-        // Launch the monitoring lifecycle as a background task so start() returns promptly.
         monitorTask = Task { [weak self] in
             guard let self else { return }
 
-            // Re-check availability inside the task (state may have changed).
             if !fileSystem.directoryExists(at: directoryURL)
                 || !fileSystem.isReadable(at: directoryURL)
             {
@@ -65,20 +54,16 @@ public final class VoiceMemoWatcher {
             }
             guard !Task.isCancelled else { return }
 
-            // Main monitoring loop: run → detect folder loss → poll → run again.
             while !Task.isCancelled {
                 let shouldRetry = await runMonitoringLoop()
                 if !shouldRetry { break }
 
-                // Folder disappeared — clear dedup state so re-created files
-                // at the same path are detected after recovery.
                 emittedPaths.removeAll()
 
                 await pollUntilAvailable()
             }
         }
 
-        // Yield once so the monitorTask has a chance to start.
         await Task.yield()
     }
 
@@ -94,9 +79,7 @@ public final class VoiceMemoWatcher {
         continuations.removeAll()
     }
 
-    /// Returns a new independent async stream of voice memo events. Each call
-    /// creates a separate stream — multiple consumers are supported (broadcast).
-    /// Late joiners do not receive historical events. Uses `.bufferingOldest(16)`.
+    /// Returns a new independent async stream of voice memo events (broadcast).
     public func events() -> AsyncStream<VoiceMemoEvent> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<VoiceMemoEvent>.makeStream(
