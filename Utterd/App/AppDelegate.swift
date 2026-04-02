@@ -127,16 +127,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             transcriptionService: transcriptionService,
             watcherStream: watcher.events(),
             logger: logger,
-            makeRoutingStage: { onComplete in
-                NoteRoutingPipelineStage(
+            makeRoutingStage: { [weak self] onComplete in
+                let wrappedOnComplete: @Sendable () async -> Void = {
+                    await MainActor.run { self?.appState?.lastProcessedDate = Date() }
+                    await onComplete()
+                }
+                let configProvider: @Sendable () -> RoutingConfiguration = {
+                    let defaults = UserDefaults.standard
+                    let llmEnabled = defaults.bool(forKey: UserSettings.Keys.llmEnabled)
+                    let useCustomPrompt = defaults.bool(forKey: UserSettings.Keys.useCustomPrompt)
+                    let customPrompt = defaults.string(forKey: UserSettings.Keys.customPrompt) ?? TranscriptClassifier.defaultCustomPrompt
+                    let summarizationEnabled = defaults.bool(forKey: UserSettings.Keys.summarizationEnabled)
+                    let defaultFolderName = defaults.string(forKey: UserSettings.Keys.defaultFolderName)
+                    let approach: RoutingConfiguration.LLMApproach
+                    if !llmEnabled {
+                        approach = .disabled
+                    } else if useCustomPrompt {
+                        approach = .customPrompt(customPrompt)
+                    } else {
+                        approach = .autoRoute
+                    }
+                    return RoutingConfiguration(
+                        llmApproach: approach,
+                        defaultFolderName: defaultFolderName,
+                        summarizationEnabled: summarizationEnabled
+                    )
+                }
+                return NoteRoutingPipelineStage(
                     notesService: notesService,
                     llmService: llmService,
                     summarizer: summarizer,
                     store: store,
                     logger: logger,
-                    mode: .routeOnly,
+                    configProvider: configProvider,
                     contextBudget: contextBudget,
-                    onComplete: onComplete
+                    onComplete: wrappedOnComplete
                 )
             }
         )

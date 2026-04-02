@@ -214,4 +214,74 @@ struct TranscriptClassifierTests {
 
         #expect(result == NoteClassificationResult(folderPath: nil, title: "Misc"))
     }
+
+    // MARK: - Custom system prompt
+
+    @Test
+    func classifyWithCustomPromptReplacesNotesFolders() async throws {
+        let llm = MockLLMService()
+        llm.result = "Work\nProject update"
+        let work = NotesFolder(id: "w", name: "Work")
+        let personal = NotesFolder(id: "p", name: "Personal")
+        let hierarchy = [
+            FolderHierarchyEntry(path: "Work", folder: work),
+            FolderHierarchyEntry(path: "Work.Meetings", folder: NotesFolder(id: "wm", name: "Meetings")),
+            FolderHierarchyEntry(path: "Personal", folder: personal),
+        ]
+        let now = makeDate(year: 2026, month: 4, day: 1, hour: 10, minute: 0)
+
+        let result = try await TranscriptClassifier.classify(
+            transcript: "Project update call",
+            hierarchy: hierarchy,
+            using: llm,
+            customSystemPrompt: "Route to:\n{notes_folders}",
+            now: now
+        )
+
+        // The LLM should have received the custom prompt with {notes_folders} replaced
+        // by ONLY top-level folder names (path without ".")
+        let call = try #require(llm.calls.first)
+        #expect(call.systemPrompt == "Route to:\n- Work\n- Personal")
+        #expect(result.folderPath == "Work")
+    }
+
+    @Test
+    func classifyWithCustomPromptWithoutPlaceholderPassesAsIs() async throws {
+        let llm = MockLLMService()
+        llm.result = "GENERAL NOTES\nNote title"
+        let hierarchy = makeHierarchy(["finance", "personal"])
+        let now = makeDate(year: 2026, month: 4, day: 1, hour: 10, minute: 0)
+
+        _ = try await TranscriptClassifier.classify(
+            transcript: "Something",
+            hierarchy: hierarchy,
+            using: llm,
+            customSystemPrompt: "Just pick a folder",
+            now: now
+        )
+
+        let call = try #require(llm.calls.first)
+        #expect(call.systemPrompt == "Just pick a folder")
+    }
+
+    @Test
+    func classifyWithoutCustomPromptUsesBuiltIn() async throws {
+        let llm = MockLLMService()
+        llm.result = "GENERAL NOTES\nTitle"
+        let hierarchy = makeHierarchy(["finance", "personal"])
+        let now = makeDate(year: 2026, month: 4, day: 1, hour: 10, minute: 0)
+
+        _ = try await TranscriptClassifier.classify(
+            transcript: "Something",
+            hierarchy: hierarchy,
+            using: llm,
+            now: now
+        )
+
+        let call = try #require(llm.calls.first)
+        // Built-in prompt contains hierarchy paths
+        #expect(call.systemPrompt.contains("- finance"))
+        #expect(call.systemPrompt.contains("- personal"))
+        #expect(call.systemPrompt.contains("GENERAL NOTES"))
+    }
 }

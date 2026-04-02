@@ -201,7 +201,7 @@ struct PipelineControllerTests {
                     summarizer: summarizer,
                     store: store,
                     logger: logger,
-                    mode: .routeOnly,
+                    configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
                     contextBudget: LLMContextBudget(totalWords: 3000, systemPromptOverhead: 200),
                     onComplete: onComplete
                 )
@@ -282,7 +282,7 @@ struct PipelineControllerTests {
                     summarizer: summarizer,
                     store: store,
                     logger: logger,
-                    mode: .routeOnly,
+                    configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
                     contextBudget: LLMContextBudget(totalWords: 3000, systemPromptOverhead: 200),
                     onComplete: onComplete
                 )

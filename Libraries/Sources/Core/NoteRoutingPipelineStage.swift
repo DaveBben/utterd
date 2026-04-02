@@ -25,7 +25,7 @@ public final class NoteRoutingPipelineStage: Sendable {
     private let summarizer: any TranscriptSummarizer
     private let store: any MemoStore
     private let logger: any WatcherLogger
-    private let mode: RoutingMode
+    private let configProvider: @Sendable () -> RoutingConfiguration
     private let contextBudget: LLMContextBudget
     private let onComplete: @Sendable () async -> Void
     private let folderCache = FolderHierarchyCache()
@@ -36,7 +36,7 @@ public final class NoteRoutingPipelineStage: Sendable {
         summarizer: any TranscriptSummarizer,
         store: any MemoStore,
         logger: any WatcherLogger,
-        mode: RoutingMode,
+        configProvider: @escaping @Sendable () -> RoutingConfiguration,
         contextBudget: LLMContextBudget,
         onComplete: @escaping @Sendable () async -> Void
     ) {
@@ -45,7 +45,7 @@ public final class NoteRoutingPipelineStage: Sendable {
         self.summarizer = summarizer
         self.store = store
         self.logger = logger
-        self.mode = mode
+        self.configProvider = configProvider
         self.contextBudget = contextBudget
         self.onComplete = onComplete
     }
@@ -72,21 +72,47 @@ public final class NoteRoutingPipelineStage: Sendable {
     // MARK: - Private
 
     private func routeCore(transcript: String, now: Date) async throws {
-        if transcript.isEmpty {
+        let config = configProvider()
+        let mode: RoutingMode = config.summarizationEnabled ? .routeAndSummarize : .routeOnly
+
+        let hierarchy = (try? await folderCache.get(using: notesService, ttl: .seconds(300))) ?? []
+        let defaultFolder = resolveDefaultFolder(config.defaultFolderName, from: hierarchy)
+
+        switch config.llmApproach {
+        case .disabled:
             _ = try await notesService.createNote(
                 title: dateFallbackTitle(for: now),
-                body: "",
-                in: nil
+                body: transcript,
+                in: defaultFolder
             )
             return
-        }
 
-        let hierarchy = try await folderCache.get(using: notesService, ttl: .seconds(300))
-        guard !hierarchy.isEmpty else {
+        case .customPrompt(let prompt) where prompt.isEmpty:
             _ = try await notesService.createNote(
                 title: dateFallbackTitle(for: now),
                 body: transcript,
                 in: nil
+            )
+            return
+
+        case .autoRoute, .customPrompt:
+            break
+        }
+
+        if transcript.isEmpty {
+            _ = try await notesService.createNote(
+                title: dateFallbackTitle(for: now),
+                body: "",
+                in: defaultFolder
+            )
+            return
+        }
+
+        guard !hierarchy.isEmpty else {
+            _ = try await notesService.createNote(
+                title: dateFallbackTitle(for: now),
+                body: transcript,
+                in: defaultFolder
             )
             return
         }
@@ -107,14 +133,26 @@ public final class NoteRoutingPipelineStage: Sendable {
             summary = nil
         }
 
+        let customPrompt: String?
+        if case .customPrompt(let prompt) = config.llmApproach {
+            customPrompt = prompt
+        } else {
+            customPrompt = nil
+        }
+
         let classification = try await TranscriptClassifier.classify(
             transcript: classificationText,
             hierarchy: hierarchy,
             using: llmService,
+            customSystemPrompt: customPrompt,
             now: now
         )
-        let folder = classification.folderPath.flatMap { path in
-            hierarchy.first { $0.path == path }?.folder
+
+        let folder: NotesFolder?
+        if let path = classification.folderPath {
+            folder = hierarchy.first { $0.path == path }?.folder ?? defaultFolder
+        } else {
+            folder = defaultFolder
         }
 
         let body: String
@@ -143,5 +181,9 @@ public final class NoteRoutingPipelineStage: Sendable {
             logger.warning("Note created in default folder: \(reason)")
         }
     }
-}
 
+    private func resolveDefaultFolder(_ name: String?, from hierarchy: [FolderHierarchyEntry]) -> NotesFolder? {
+        guard let name else { return nil }
+        return hierarchy.filter { !$0.path.contains(".") }.first { $0.folder.name == name }?.folder
+    }
+}

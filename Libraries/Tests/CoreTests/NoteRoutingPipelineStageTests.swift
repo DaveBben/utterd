@@ -31,7 +31,7 @@ struct NoteRoutingPipelineStageTests {
         summarizer: MockTranscriptSummarizer = MockTranscriptSummarizer(),
         store: MockMemoStore,
         logger: MockWatcherLogger = MockWatcherLogger(),
-        mode: RoutingMode = .routeOnly,
+        config: RoutingConfiguration = RoutingConfiguration(llmApproach: .autoRoute),
         contextBudget: LLMContextBudget,
         completeCounter: ActorBox<Int> = ActorBox(0)
     ) -> NoteRoutingPipelineStage {
@@ -41,7 +41,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             logger: logger,
-            mode: mode,
+            configProvider: { config },
             contextBudget: contextBudget,
             onComplete: { await completeCounter.increment() }
         )
@@ -107,7 +107,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             logger: MockWatcherLogger(),
-            mode: .routeOnly,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
             contextBudget: tinyBudget(),
             onComplete: {}
         )
@@ -239,7 +239,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: MockTranscriptSummarizer(),
             store: store,
             logger: logger,
-            mode: .routeOnly,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
             contextBudget: smallBudget(),
             onComplete: { await completeCounter.increment() }
         )
@@ -276,7 +276,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: MockTranscriptSummarizer(),
             store: store,
             logger: logger,
-            mode: .routeOnly,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
             contextBudget: smallBudget(),
             onComplete: { await completeCounter.increment() }
         )
@@ -313,7 +313,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             logger: MockWatcherLogger(),
-            mode: .routeOnly,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
             contextBudget: tinyBudget(),
             onComplete: {}
         )
@@ -347,7 +347,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             logger: MockWatcherLogger(),
-            mode: .routeAndSummarize,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute, summarizationEnabled: true) },
             contextBudget: tinyBudget(),
             onComplete: {}
         )
@@ -381,7 +381,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             logger: MockWatcherLogger(),
-            mode: .routeAndSummarize,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute, summarizationEnabled: true) },
             contextBudget: smallBudget(),
             onComplete: {}
         )
@@ -422,7 +422,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: MockTranscriptSummarizer(),
             store: storeA,
             logger: MockWatcherLogger(),
-            mode: .routeOnly,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
             contextBudget: smallBudget(),
             onComplete: {}
         )
@@ -432,7 +432,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: MockTranscriptSummarizer(),
             store: storeB,
             logger: MockWatcherLogger(),
-            mode: .routeAndSummarize,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute, summarizationEnabled: true) },
             contextBudget: smallBudget(),
             onComplete: {}
         )
@@ -526,7 +526,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: MockTranscriptSummarizer(),
             store: store,
             logger: MockWatcherLogger(),
-            mode: .routeOnly,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
             contextBudget: smallBudget(),
             onComplete: { await completeCounter.increment() }
         )
@@ -557,7 +557,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: MockTranscriptSummarizer(),
             store: store,
             logger: MockWatcherLogger(),
-            mode: .routeOnly,
+            configProvider: { RoutingConfiguration(llmApproach: .autoRoute) },
             contextBudget: smallBudget(),
             onComplete: { await completeCounter.increment() }
         )
@@ -570,5 +570,253 @@ struct NoteRoutingPipelineStageTests {
         #expect(markCalls.count == 1)
         #expect(markCalls[0].fileURL == fileURL)
         #expect(await completeCounter.get() == 1)
+    }
+
+    // MARK: - .disabled LLM approach
+
+    @Test
+    func disabledLLMSkipsClassificationAndCreatesNoteWithDateTitle() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        let summarizer = MockTranscriptSummarizer()
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .disabled),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls.isEmpty)
+        #expect(summarizer.calls.isEmpty)
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder == nil)
+        #expect(notes.createNoteCalls[0].body == "Buy groceries")
+    }
+
+    @Test
+    func disabledLLMWithMatchingDefaultFolderCreatesNoteInThatFolder() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .disabled, defaultFolderName: "personal"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls.isEmpty)
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder == personal)
+    }
+
+    @Test
+    func disabledLLMWithUnknownDefaultFolderCreatesNoteInSystemDefault() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .disabled, defaultFolderName: "Gone"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder == nil)
+    }
+
+    @Test
+    func disabledLLMWithDefaultFolderWhenHierarchyFetchFailsCreatesNoteInSystemDefault() async throws {
+        let notes = MockNotesService()
+        struct FetchError: Error {}
+        notes.listFoldersError = FetchError()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .disabled, defaultFolderName: "personal"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder == nil)
+    }
+
+    // MARK: - .customPrompt LLM approach
+
+    @Test
+    func customPromptApproachCallsLLMWithCustomPrompt() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "personal\nGrocery list"
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .customPrompt("my prompt {notes_folders}")),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls.count == 1)
+        #expect(llm.calls[0].systemPrompt.contains("my prompt"))
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder == personal)
+    }
+
+    @Test
+    func emptyCustomPromptSkipsLLMAndRoutesToDefault() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .customPrompt("")),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls.isEmpty)
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder == nil)
+    }
+
+    // MARK: - summarizationEnabled flag
+
+    @Test
+    func summarizationEnabledTrueUsesSummaryAsBody() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "personal\nMeeting notes"
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "condensed"
+
+        let store = MockMemoStore()
+        let fullTranscript = "one two three four five"
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .autoRoute, summarizationEnabled: true),
+            contextBudget: tinyBudget()
+        )
+
+        let result = TranscriptionResult(transcript: fullTranscript, fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].body == "condensed")
+    }
+
+    @Test
+    func summarizationEnabledFalseUsesFullTranscriptAsBody() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "personal\nMeeting notes"
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "condensed"
+
+        let store = MockMemoStore()
+        let fullTranscript = "one two three four five"
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .autoRoute, summarizationEnabled: false),
+            contextBudget: tinyBudget()
+        )
+
+        let result = TranscriptionResult(transcript: fullTranscript, fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].body == fullTranscript)
+    }
+
+    // MARK: - Unrecognized folder with defaultFolderName
+
+    @Test
+    func unrecognizedFolderWithDefaultFolderNameRoutesToDefaultFolder() async throws {
+        let personal = makePersonalFolder()
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [personal], "personal": []]
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "unknown.path\nSome title"  // not in hierarchy
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(llmApproach: .autoRoute, defaultFolderName: "personal"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder == personal)
     }
 }

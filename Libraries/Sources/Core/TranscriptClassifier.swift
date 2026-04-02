@@ -33,13 +33,26 @@ public struct TranscriptClassifier {
     /// Classifies the transcript and returns a folder path (or nil for general)
     /// plus a short title. The `now` date is used only to generate fallback titles
     /// when the LLM response contains no usable title.
+    ///
+    /// Pass `customSystemPrompt` to override the built-in prompt. The placeholder
+    /// `{notes_folders}` is replaced with the list of top-level folder names.
     public static func classify(
         transcript: String,
         hierarchy: [FolderHierarchyEntry],
         using llm: any LLMService,
+        customSystemPrompt: String? = nil,
         now: Date
     ) async throws -> NoteClassificationResult {
-        let systemPrompt = buildSystemPrompt(hierarchy: hierarchy)
+        let systemPrompt: String
+        if let customSystemPrompt {
+            let topLevelFolders = hierarchy
+                .filter { !$0.path.contains(".") }
+                .map { "- \($0.folder.name)" }
+                .joined(separator: "\n")
+            systemPrompt = customSystemPrompt.replacingOccurrences(of: "{notes_folders}", with: topLevelFolders)
+        } else {
+            systemPrompt = buildSystemPrompt(hierarchy: hierarchy)
+        }
         let response = try await llm.generate(systemPrompt: systemPrompt, userPrompt: transcript)
         return parse(response: response, hierarchy: hierarchy, now: now)
     }
