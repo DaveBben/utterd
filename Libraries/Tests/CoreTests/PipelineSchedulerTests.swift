@@ -233,38 +233,6 @@ struct PipelineSchedulerTests {
         #expect(count >= 2)
     }
 
-    // MARK: - handler returns true → lock stays held next cycle
-
-    @Test func handlerReturnsTrueLockStaysHeld() async throws {
-        let store = MockMemoStore()
-        let record = makeRecord()
-        await store.setOldestUnprocessed(record)
-
-        let handlerCallCount = ActorBox<Int>(0)
-        let logger = MockWatcherLogger()
-
-        // Handler always returns true — lock stays held after first call
-        let scheduler = PipelineScheduler(
-            store: store,
-            clock: ImmediateClock(),
-            pollingInterval: .milliseconds(1),
-            logger: logger,
-            handler: { _ in
-                await handlerCallCount.increment()
-                return true
-            }
-        )
-
-        await scheduler.start()
-        try await Task.sleep(for: .milliseconds(100))
-        scheduler.stop()
-
-        // Processed exactly once, then subsequent cycles skipped due to held lock
-        let count = await handlerCallCount.get()
-        #expect(count == 1)
-        #expect(logger.infos.contains("Lock held, skipping"))
-    }
-
     // MARK: - handler returns false → lock released, next record eligible
 
     @Test func handlerReturnsFalseLockReleased() async throws {

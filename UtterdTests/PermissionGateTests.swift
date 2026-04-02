@@ -6,33 +6,28 @@ import Testing
 @Suite("PermissionGate")
 struct PermissionGateTests {
 
-    // AC: isReadable false -> evaluatePermissionGate returns .showPermissionAlert
     @Test("evaluatePermissionGate returns showPermissionAlert when access is denied")
     @MainActor
     func evaluateGateWhenAccessDenied() {
         let mock = MockFileSystemChecker()
         mock.readableResult = false
-        let checker = PermissionChecker(fileSystem: mock)
 
-        let action = evaluatePermissionGate(checker: checker)
+        let action = evaluatePermissionGate(fileSystem: mock)
 
         #expect(action == .showPermissionAlert)
     }
 
-    // AC: isReadable true -> evaluatePermissionGate returns .proceed
     @Test("evaluatePermissionGate returns proceed when access is granted")
     @MainActor
     func evaluateGateWhenAccessGranted() {
         let mock = MockFileSystemChecker()
         mock.readableResult = true
-        let checker = PermissionChecker(fileSystem: mock)
 
-        let action = evaluatePermissionGate(checker: checker)
+        let action = evaluatePermissionGate(fileSystem: mock)
 
         #expect(action == .proceed)
     }
 
-    // E3: handleOpenSystemSettings always calls terminate, even when openURL returns false
     @Test("handleOpenSystemSettings calls terminate exactly once when openURL fails")
     @MainActor
     func handleOpenSystemSettingsCallsTerminateOnURLFailure() {
@@ -46,7 +41,6 @@ struct PermissionGateTests {
         #expect(terminateCallCount == 1)
     }
 
-    // AC: handleOpenSystemSettings passes a URL containing "Privacy_AllFiles" to openURL
     @Test("handleOpenSystemSettings opens URL containing Privacy_AllFiles")
     @MainActor
     func handleOpenSystemSettingsOpensPrivacyAllFilesURL() {
@@ -60,20 +54,10 @@ struct PermissionGateTests {
         #expect(receivedURL?.absoluteString.contains("Privacy_AllFiles") == true)
     }
 
-    // AC: after evaluatePermissionGate returns .proceed, the caller can set permissionResolved = true
-    @Test("permissionResolved can be set true after evaluatePermissionGate returns proceed")
-    @MainActor
-    func permissionResolvedSetAfterProceed() {
-        let mock = MockFileSystemChecker()
-        mock.readableResult = true
-        let checker = PermissionChecker(fileSystem: mock)
-        let appState = AppState()
-
-        let action = evaluatePermissionGate(checker: checker)
-        if action == .proceed {
-            appState.permissionResolved = true
-        }
-
-        #expect(appState.permissionResolved == true)
+    @Test("voiceMemoDirectoryURL ends with the expected Voice Memos path component")
+    func voiceMemoDirectoryURLPath() {
+        #expect(voiceMemoDirectoryURL.path.hasSuffix(
+            "Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings"
+        ))
     }
 }

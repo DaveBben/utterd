@@ -48,6 +48,11 @@ targets:
     platform: macOS
     sources:
       - path: UtterdTests
+        excludes:
+          - Fixtures/**
+      - path: UtterdTests/Fixtures
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: Utterd
     settings:

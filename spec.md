@@ -7,7 +7,7 @@
 
 ## What This Project Does
 
-Utterd is a macOS menu bar daemon that automatically turns voice memos into Apple Notes. It monitors the iCloud Voice Memos sync directory, transcribes audio on-device (macOS 26+), and optionally uses a language model to pick the right Notes folder and summarize the content — no manual intervention after setup. Built for a single user who wants frictionless voice capture without thinking about where things go.
+Utterd is a macOS menu bar daemon that automatically turns voice memos into Apple Notes. It monitors the iCloud Voice Memos sync directory, transcribes audio on-device (macOS 26+), and uses a language model to pick the right Notes folder (summarization is supported but not yet enabled) — no manual intervention after setup. Built for a single user who wants frictionless voice capture without thinking about where things go.
 
 ---
 
@@ -21,7 +21,7 @@ Utterd is a macOS menu bar daemon that automatically turns voice memos into Appl
 
 - Ship a working end-to-end pipeline: voice memo file appears on disk → note shows up in the right Apple Notes folder within 5 minutes, zero manual steps
 - Every memo processed exactly once — no duplicates, no misses, even across restarts and duplicate file events
-- Privacy by default: on-device LLM (macOS 26+) as the primary provider; remote endpoint only as a configured fallback
+- Privacy by default: on-device LLM (macOS 26+) for all processing — no memo content leaves the machine
 - Eventually open-source the project — codebase must be clean, self-documenting, and easy for outside contributors to build and run
 
 ---
@@ -39,9 +39,9 @@ Utterd is a macOS menu bar daemon that automatically turns voice memos into Appl
 
 ## Non-Functional Requirements
 
-- **Performance**: End-to-end processing of a single memo completes in under 60 seconds, excluding network latency for remote LLM calls and iCloud sync time
-- **Privacy**: On-device LLM → no memo content leaves the machine. Remote LLM → user is explicitly informed that transcript text will be sent to the configured server
-- **Security**: If a remote LLM fallback is configured, credentials are stored in system Keychain only — never in plaintext config. LLM prompts must be hardened against injection from transcript content
+- **Performance**: End-to-end processing of a single memo completes in under 60 seconds, excluding iCloud sync time
+- **Privacy**: On-device LLM → no memo content leaves the machine
+- **Security**: LLM prompts must be hardened against injection from transcript content
 - **Persistence**: Deduplication store and failure log survive app restarts. Entries older than 90 days may be pruned automatically
 - **Failure thresholds**: Each memo attempted once. No automatic retry. 10+ consecutive failures → error state in status indicator
 - **Reliability**: App must run indefinitely without memory leaks or resource exhaustion. Must survive directory changes, LLM unavailability, and API failures without crashing
@@ -51,19 +51,18 @@ Utterd is a macOS menu bar daemon that automatically turns voice memos into Appl
 ## Architecture Summary
 
 ```
-iCloud Sync ──▶ [File Watcher] ──▶ [Transcribe] ──▶ [LLM: route + summarize] ──▶ Apple Notes
-  (.m4a files)                        (on-device)         (optional)              (AppleScript)
-                                                      ├─ On-device (Foundation Model, macOS 26+)
-                                                      └─ Remote fallback (OpenAI-compatible)
+iCloud Sync ──▶ [File Watcher] ──▶ [Transcribe] ──▶ [LLM: classify] ──▶ Apple Notes
+  (.m4a files)                        (on-device)      (on-device)        (AppleScript)
+                                                    On-device Foundation Model (macOS 26+)
 ```
 
 **Key design patterns:**
-- Sequential pipes-and-filters pipeline — detection → copy → transcription → (optional) folder classification + summarization → note creation → dedup → cleanup. Each stage is an isolated function with typed inputs/outputs
-- Protocol-based LLM provider abstraction — a Swift protocol defines the LLM interface; concrete types implement on-device and remote variants
+- Sequential pipes-and-filters pipeline — detection → copy → transcription → folder classification → note creation → dedup → cleanup. Each stage is an isolated function with typed inputs/outputs
+- Protocol-based LLM provider abstraction — a Swift protocol defines the LLM interface; the on-device Foundation Model is the only concrete provider today. The protocol enables adding a remote variant later
 - Exactly-once processing via persistent dedup store — checked before processing, written after successful creation
 
 **Data flow:**
-A new .m4a file arrives in the watched directory → copied to a temp location → audio transcribed via on-device speech-to-text → if an LLM provider is available, transcript is classified into a top-level Apple Notes folder and optionally summarized → note created in Apple Notes via AppleScript → file identity recorded in dedup store → temp copy cleaned up. When no LLM is available, notes are created in the default folder with the raw transcript.
+A new .m4a file arrives in the watched directory → copied to a temp location → audio transcribed via on-device speech-to-text → transcript classified into a Notes folder by on-device LLM → note created in Apple Notes via AppleScript with full transcript as body → file identity recorded in dedup store → temp copy cleaned up. On macOS 15–25, the pipeline does not start; memos are not processed until the user upgrades to macOS 26+.
 
 ---
 
@@ -78,7 +77,7 @@ A new .m4a file arrives in the watched directory → copied to a temp location �
 | @Observable over ObservableObject | Per-property view invalidation, less boilerplate, modern Swift pattern | 2026-03-24 | ObservableObject + @Published — legacy pattern |
 | AppleScript for Notes | Only known mechanism for programmatic Notes access with folder targeting | 2026-03-24 | Scripting Bridge — rejected; NSAppleScript avoids generated bridge headers and works without App Store entitlements |
 | LLM for folder routing, not multi-app classification | Simpler prompt, fewer failure modes, graceful degradation (default folder when LLM unavailable) | 2026-04-01 | Multi-destination classification to Reminders/Calendar/Notes — rejected as over-engineered for single-user MVP |
-| Keychain for remote LLM credentials | macOS security standard — avoids plaintext secrets in config files | 2026-03-24 | Plaintext in YAML config — rejected for security |
+| Keychain for remote LLM credentials (deferred — no remote provider currently implemented) | macOS security standard — avoids plaintext secrets in config files | 2026-03-24 | Plaintext in YAML config — rejected for security |
 
 ---
 
@@ -154,9 +153,7 @@ class BadModel: ObservableObject {
 |---------|---------|------|------|
 | iCloud Voice Memos sync directory | Source of .m4a voice memo files | Disk access permission | `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` |
 | macOS Foundation Model (macOS 26+) | On-device LLM for folder classification and optional summarization | None (on-device) | Apple platform docs |
-| Remote LLM (OpenAI-compatible) | Fallback LLM provider | API key in Keychain | User-configured endpoint URL |
 | AppleScript (NSAppleScript) | Notes item creation with folder targeting | Automation permission | Apple AppleScript docs |
-| System Keychain | Secure credential storage for remote LLM | Keychain Services API | Apple Security framework docs |
 | FSEvents (CoreServices) | File system monitoring for new voice memos | Disk access permission | Apple FSEvents docs |
 
 ---
@@ -192,5 +189,5 @@ class BadModel: ObservableObject {
 - **Speech-to-text requires macOS 26+**: On-device transcription uses the `SpeechAnalyzer` API (available macOS 26+). Earlier macOS versions cannot run the transcription pipeline
 - **Foundation Model availability for unsandboxed apps**: The app runs outside the App Store sandbox. Whether macOS Foundation Model framework works for unsandboxed apps is unconfirmed
 - **Notes AppleScript limitations**: Programmatic Notes access via AppleScript is less well-documented than EventKit. Folder targeting is implemented (plain text only); rich text and HTML content formatting support need investigation
-- **App is partially implemented**: The voice memo file watcher (detection stage) and transcription pipeline (Stage 1) are functional in `Libraries/Sources/Core/`. The menu bar icon (`MenuBarExtra`) is implemented and shows a static placeholder popover. Stage 2 (LLM classification and Notes routing/creation) is implemented in `Libraries/Sources/Core/`. Routing to Reminders and Calendar remains unimplemented
-- **macOS 15 vs macOS 26 split**: On-device LLM requires macOS 26+. On macOS 15–25, the app requires a configured remote endpoint and must surface an alert if no provider is available
+- **App is partially implemented**: The full pipeline (file detection, transcription, LLM classification, and Notes routing/creation) is wired end-to-end in `AppDelegate` on macOS 26+. The menu bar icon (`MenuBarExtra`) is implemented and shows a static placeholder popover. Routing to Reminders and Calendar remains unimplemented
+- **macOS 15 vs macOS 26 split**: On-device transcription and LLM require macOS 26+. On macOS 15–25, the pipeline does not start — new memos are not detected or processed until the user upgrades. Remote LLM fallback is a future consideration, not currently implemented

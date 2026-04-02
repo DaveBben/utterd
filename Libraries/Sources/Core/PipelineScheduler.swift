@@ -1,13 +1,7 @@
 import Foundation
 
 /// Polls ``MemoStore`` on a fixed interval and dispatches the oldest unprocessed
-/// record to a pipeline handler.
-///
-/// Uses an in-memory lock to prevent concurrent processing: the lock is set before
-/// the handler is called, and automatically cleared when the handler returns `false`.
-/// ``releaseLock()`` is also exposed publicly for future stages that need to release
-/// the lock externally. On `start()`, the lock is always reset to `false` to recover
-/// from a previous crash mid-processing.
+/// record to a pipeline handler. Uses a lock to prevent concurrent processing.
 @MainActor
 public final class PipelineScheduler {
     private let store: any MemoStore

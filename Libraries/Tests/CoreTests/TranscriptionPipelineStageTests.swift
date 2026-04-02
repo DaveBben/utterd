@@ -27,9 +27,9 @@ struct TranscriptionPipelineStageTests {
         return dir
     }
 
-    // MARK: - Success: emits result via onResult and returns true
+    // MARK: - Success: returns result
 
-    @Test func successfulTranscriptionCallsOnResultAndReturnsTrue() async throws {
+    @Test func successfulTranscriptionReturnsResult() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
@@ -39,24 +39,17 @@ struct TranscriptionPipelineStageTests {
         let service = MockTranscriptionService()
         service.result = TranscriptionResult(transcript: "Buy groceries", fileURL: fileURL)
 
-        let store = MockMemoStore()
-        let logger = MockWatcherLogger()
-
-        let receivedResults = ActorBox<[TranscriptionResult]>([])
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: store,
-            logger: logger,
-            onResult: { result in await receivedResults.append(result) }
+            store: MockMemoStore(),
+            logger: MockWatcherLogger()
         )
 
-        let returned = await stage.process(record)
+        let result = await stage.process(record)
 
-        #expect(returned == true)
-        let results = await receivedResults.get()
-        #expect(results.count == 1)
-        #expect(results[0].transcript == "Buy groceries")
-        #expect(results[0].fileURL == fileURL)
+        #expect(result != nil)
+        #expect(result?.transcript == "Buy groceries")
+        #expect(result?.fileURL == fileURL)
     }
 
     // MARK: - Success: original URL in result, not temp
@@ -71,18 +64,15 @@ struct TranscriptionPipelineStageTests {
         let service = MockTranscriptionService()
         service.result = TranscriptionResult(transcript: "Hello", fileURL: fileURL)
 
-        let receivedResults = ActorBox<[TranscriptionResult]>([])
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
             store: MockMemoStore(),
-            logger: MockWatcherLogger(),
-            onResult: { result in await receivedResults.append(result) }
+            logger: MockWatcherLogger()
         )
 
-        await stage.process(record)
+        let result = await stage.process(record)
 
-        let results = await receivedResults.get()
-        #expect(results[0].fileURL == fileURL)
+        #expect(result?.fileURL == fileURL)
     }
 
     // MARK: - File is copied: service receives a different (temp) URL
@@ -100,11 +90,10 @@ struct TranscriptionPipelineStageTests {
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
             store: MockMemoStore(),
-            logger: MockWatcherLogger(),
-            onResult: { _ in }
+            logger: MockWatcherLogger()
         )
 
-        await stage.process(record)
+        _ = await stage.process(record)
 
         #expect(service.transcribeCalls.count == 1)
         #expect(service.transcribeCalls[0] != fileURL)
@@ -120,18 +109,16 @@ struct TranscriptionPipelineStageTests {
         let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
 
         let service = MockTranscriptionService()
+        service.result = TranscriptionResult(transcript: "Note", fileURL: fileURL)
+
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
             store: MockMemoStore(),
-            logger: MockWatcherLogger(),
-            onResult: { _ in }
+            logger: MockWatcherLogger()
         )
-        // Intercept the temp URL by overriding service after first call
-        service.result = TranscriptionResult(transcript: "Note", fileURL: fileURL)
 
-        await stage.process(record)
+        _ = await stage.process(record)
 
-        // The temp URL passed to the service should no longer exist
         let tempURL = service.transcribeCalls.first
         if let tempURL {
             #expect(!FileManager.default.fileExists(atPath: tempURL.path))
@@ -140,9 +127,9 @@ struct TranscriptionPipelineStageTests {
         }
     }
 
-    // MARK: - Success: empty transcript is still emitted and returns true
+    // MARK: - Success: empty transcript is still returned
 
-    @Test func emptyTranscriptEmittedAsSuccess() async throws {
+    @Test func emptyTranscriptReturnedAsSuccess() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
@@ -152,23 +139,19 @@ struct TranscriptionPipelineStageTests {
         let service = MockTranscriptionService()
         service.result = TranscriptionResult(transcript: "", fileURL: fileURL)
 
-        let receivedResults = ActorBox<[TranscriptionResult]>([])
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
             store: MockMemoStore(),
-            logger: MockWatcherLogger(),
-            onResult: { result in await receivedResults.append(result) }
+            logger: MockWatcherLogger()
         )
 
-        let returned = await stage.process(record)
+        let result = await stage.process(record)
 
-        #expect(returned == true)
-        let results = await receivedResults.get()
-        #expect(results.count == 1)
-        #expect(results[0].transcript == "")
+        #expect(result != nil)
+        #expect(result?.transcript == "")
     }
 
-    // MARK: - Failure: transcription error logs, calls markProcessed, returns false
+    // MARK: - Failure: transcription error logs, calls markProcessed, returns nil
 
     @Test func transcriptionFailureLogsAndCallsMarkProcessed() async throws {
         let dir = try tempDir()
@@ -184,48 +167,19 @@ struct TranscriptionPipelineStageTests {
         let store = MockMemoStore()
         let logger = MockWatcherLogger()
 
-        let onResultCalled = ActorBox<Bool>(false)
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
             store: store,
-            logger: logger,
-            onResult: { _ in await onResultCalled.set(true) }
+            logger: logger
         )
 
-        let returned = await stage.process(record)
+        let result = await stage.process(record)
 
-        #expect(returned == false)
+        #expect(result == nil)
         #expect(!logger.errors.isEmpty)
         let calls = await store.markProcessedCalls
         #expect(calls.count == 1)
         #expect(calls[0].fileURL == fileURL)
-        #expect(!(await onResultCalled.get()))
-    }
-
-    // MARK: - Failure: onResult is NOT called
-
-    @Test func transcriptionFailureDoesNotCallOnResult() async throws {
-        let dir = try tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let fileURL = try makeRealFile(in: dir)
-        let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
-
-        struct SomeError: Error {}
-        let service = MockTranscriptionService()
-        service.error = SomeError()
-
-        let onResultCalled = ActorBox<Bool>(false)
-        let stage = TranscriptionPipelineStage(
-            transcriptionService: service,
-            store: MockMemoStore(),
-            logger: MockWatcherLogger(),
-            onResult: { _ in await onResultCalled.set(true) }
-        )
-
-        await stage.process(record)
-
-        #expect(!(await onResultCalled.get()))
     }
 
     // MARK: - Failure: copy fails when file does not exist
@@ -238,22 +192,19 @@ struct TranscriptionPipelineStageTests {
         let store = MockMemoStore()
         let logger = MockWatcherLogger()
 
-        let onResultCalled = ActorBox<Bool>(false)
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
             store: store,
-            logger: logger,
-            onResult: { _ in await onResultCalled.set(true) }
+            logger: logger
         )
 
-        let returned = await stage.process(record)
+        let result = await stage.process(record)
 
-        #expect(returned == false)
+        #expect(result == nil)
         #expect(!logger.errors.isEmpty)
         let calls = await store.markProcessedCalls
         #expect(calls.count == 1)
         #expect(calls[0].fileURL == missingURL)
-        #expect(!(await onResultCalled.get()))
     }
 
     // MARK: - Failure: temp file cleaned up after error
@@ -272,11 +223,10 @@ struct TranscriptionPipelineStageTests {
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
             store: MockMemoStore(),
-            logger: MockWatcherLogger(),
-            onResult: { _ in }
+            logger: MockWatcherLogger()
         )
 
-        await stage.process(record)
+        _ = await stage.process(record)
 
         let tempURL = service.transcribeCalls.first
         if let tempURL {
@@ -286,4 +236,3 @@ struct TranscriptionPipelineStageTests {
         // which is also an acceptable clean state.
     }
 }
-
