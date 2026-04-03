@@ -1,54 +1,49 @@
 import Foundation
 import Testing
-@testable import Utterd
 import Core
+@testable import Utterd
 
 @Suite("SettingsLLMSection")
 struct SettingsLLMSectionTests {
-    @Test("LLM disabled produces .disabled configuration regardless of other settings")
+
+    @Test("fresh defaults produce both toggles off")
     @MainActor
-    func llmDisabledProducesDisabledConfig() {
+    func freshDefaultsBothOff() {
         let suiteName = "test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let settings = UserSettings(defaults: defaults)
-        settings.llmEnabled = false
-        settings.useCustomPrompt = true
-        settings.customPrompt = "Custom"
-        settings.summarizationEnabled = true
-
         let config = settings.toRoutingConfiguration()
-        #expect(config.llmApproach == .disabled)
+        #expect(config.summarizationEnabled == false)
+        #expect(config.titleGenerationEnabled == false)
     }
 
-    @Test("Assigning defaultCustomPrompt to customPrompt round-trips correctly")
+    @Test("only summarizationEnabled on")
     @MainActor
-    func resetToDefaultRestoresPrompt() {
-        let suiteName = "test-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let settings = UserSettings(defaults: defaults)
-        settings.customPrompt = "Edited prompt"
-        #expect(settings.customPrompt == "Edited prompt")
-
-        settings.customPrompt = TranscriptClassifier.defaultCustomPrompt
-        #expect(settings.customPrompt == TranscriptClassifier.defaultCustomPrompt)
-    }
-
-    @Test("Summarization enabled with LLM disabled still produces .disabled config")
-    @MainActor
-    func summarizationWithLLMDisabledStillDisabled() {
+    func onlySummarizationOn() {
         let suiteName = "test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let settings = UserSettings(defaults: defaults)
         settings.summarizationEnabled = true
-        settings.llmEnabled = false
-
         let config = settings.toRoutingConfiguration()
-        #expect(config.llmApproach == .disabled)
+        #expect(config.summarizationEnabled == true)
+        #expect(config.titleGenerationEnabled == false)
+    }
+
+    @Test("only titleGenerationEnabled on")
+    @MainActor
+    func onlyTitleGenerationOn() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        settings.titleGenerationEnabled = true
+        let config = settings.toRoutingConfiguration()
+        #expect(config.summarizationEnabled == false)
+        #expect(config.titleGenerationEnabled == true)
     }
 }

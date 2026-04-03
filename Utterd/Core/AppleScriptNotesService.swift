@@ -75,58 +75,6 @@ struct AppleScriptNotesService: NotesService {
         return parseFolderLines(raw)
     }
 
-    func resolveHierarchy(for folder: NotesFolder) async throws -> [NotesFolder] {
-        let script = """
-            tell application "Notes"
-                set output to ""
-                repeat with f in every folder of default account
-                    set fid to id of f
-                    set fname to name of f
-                    try
-                        set cid to id of container of f
-                    on error
-                        set cid to ""
-                    end try
-                    set output to output & fid & tab & fname & tab & cid & linefeed
-                end repeat
-                return output
-            end tell
-            """
-
-        let raw: String
-        do {
-            raw = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
-
-        let allFolders = parseFolderLines(raw)
-        let byID = Dictionary(allFolders.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
-
-        guard let freshFolder = byID[folder.id] else {
-            throw NotesServiceError.folderNotFound(folder.id)
-        }
-
-        var visited = Set<String>()
-        var path: [NotesFolder] = [freshFolder]
-        var current = freshFolder
-        while let containerID = current.containerID {
-            guard visited.insert(containerID).inserted else {
-                throw NotesServiceError.folderNotFound("Circular folder hierarchy detected")
-            }
-            guard let parent = byID[containerID] else {
-                // containerID points to the account, not a folder — we've reached the root
-                break
-            }
-            path.append(parent)
-            current = parent
-        }
-
-        return path.reversed()
-    }
-
     // Parses tab-delimited folder output: each line is "id\tname\tcontainerID\n".
     // containerID field may be empty (top-level folders).
     private func parseFolderLines(_ raw: String) -> [NotesFolder] {

@@ -6,8 +6,6 @@ import Core
 @Suite("UserSettings")
 struct UserSettingsTests {
 
-    // MARK: - Defaults
-
     @Test("fresh UserDefaults suite has correct defaults")
     @MainActor
     func freshDefaults() {
@@ -17,27 +15,37 @@ struct UserSettingsTests {
 
         let settings = UserSettings(defaults: defaults)
 
-        #expect(settings.llmEnabled == false)
-        #expect(settings.defaultFolderName == nil)
-        #expect(settings.useCustomPrompt == false)
-        #expect(settings.customPrompt == TranscriptClassifier.defaultCustomPrompt)
         #expect(settings.summarizationEnabled == false)
+        #expect(settings.titleGenerationEnabled == false)
+        #expect(settings.defaultFolderName == nil)
     }
 
-    // MARK: - Persistence
-
-    @Test("llmEnabled persists across re-init")
+    @Test("titleGenerationEnabled persists across re-init")
     @MainActor
-    func llmEnabledPersists() {
+    func titleGenerationEnabledPersists() {
         let suiteName = "test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let settings = UserSettings(defaults: defaults)
-        settings.llmEnabled = true
+        settings.titleGenerationEnabled = true
 
         let reloaded = UserSettings(defaults: defaults)
-        #expect(reloaded.llmEnabled == true)
+        #expect(reloaded.titleGenerationEnabled == true)
+    }
+
+    @Test("summarizationEnabled persists across re-init")
+    @MainActor
+    func summarizationEnabledPersists() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        settings.summarizationEnabled = true
+
+        let reloaded = UserSettings(defaults: defaults)
+        #expect(reloaded.summarizationEnabled == true)
     }
 
     @Test("defaultFolderName persists across re-init")
@@ -54,70 +62,34 @@ struct UserSettingsTests {
         #expect(reloaded.defaultFolderName == "Work")
     }
 
-    @Test("useCustomPrompt and customPrompt persist across re-init")
+    @Test("toRoutingConfiguration with both false")
     @MainActor
-    func customPromptPersists() {
+    func routingConfigBothFalse() {
         let suiteName = "test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let settings = UserSettings(defaults: defaults)
-        settings.useCustomPrompt = true
-        settings.customPrompt = "Custom text"
-
-        let reloaded = UserSettings(defaults: defaults)
-        #expect(reloaded.useCustomPrompt == true)
-        #expect(reloaded.customPrompt == "Custom text")
+        let config = settings.toRoutingConfiguration()
+        #expect(config == RoutingConfiguration(summarizationEnabled: false, titleGenerationEnabled: false))
     }
 
-    // MARK: - toRoutingConfiguration
-
-    @Test("toRoutingConfiguration with LLM disabled returns .disabled approach")
+    @Test("toRoutingConfiguration with both true")
     @MainActor
-    func routingConfigDisabled() {
+    func routingConfigBothTrue() {
         let suiteName = "test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let settings = UserSettings(defaults: defaults)
-        settings.llmEnabled = false
+        settings.summarizationEnabled = true
+        settings.titleGenerationEnabled = true
 
         let config = settings.toRoutingConfiguration()
-        #expect(config.llmApproach == RoutingConfiguration.LLMApproach.disabled)
+        #expect(config == RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true))
     }
 
-    @Test("toRoutingConfiguration with LLM enabled and useCustomPrompt false returns .autoRoute")
-    @MainActor
-    func routingConfigAutoRoute() {
-        let suiteName = "test-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let settings = UserSettings(defaults: defaults)
-        settings.llmEnabled = true
-        settings.useCustomPrompt = false
-
-        let config = settings.toRoutingConfiguration()
-        #expect(config.llmApproach == RoutingConfiguration.LLMApproach.autoRoute)
-    }
-
-    @Test("toRoutingConfiguration with LLM enabled and useCustomPrompt true returns .customPrompt")
-    @MainActor
-    func routingConfigCustomPrompt() {
-        let suiteName = "test-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let settings = UserSettings(defaults: defaults)
-        settings.llmEnabled = true
-        settings.useCustomPrompt = true
-        settings.customPrompt = "Custom text"
-
-        let config = settings.toRoutingConfiguration()
-        #expect(config.llmApproach == RoutingConfiguration.LLMApproach.customPrompt("Custom text"))
-    }
-
-    @Test("toRoutingConfiguration maps summarizationEnabled and defaultFolderName")
+    @Test("toRoutingConfiguration maps defaultFolderName correctly")
     @MainActor
     func routingConfigMapsAllFields() {
         let suiteName = "test-\(UUID().uuidString)"
@@ -126,10 +98,29 @@ struct UserSettingsTests {
 
         let settings = UserSettings(defaults: defaults)
         settings.summarizationEnabled = true
-        settings.defaultFolderName = "Personal"
+        settings.defaultFolderName = "Work"
 
         let config = settings.toRoutingConfiguration()
         #expect(config.summarizationEnabled == true)
-        #expect(config.defaultFolderName == "Personal")
+        #expect(config.titleGenerationEnabled == false)
+        #expect(config.defaultFolderName == "Work")
+    }
+
+    @Test("stale UserDefaults keys removed on init")
+    @MainActor
+    func staleKeyCleanup() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: "useCustomPrompt")
+        defaults.set("old prompt", forKey: "customPrompt")
+        defaults.set(true, forKey: "llmEnabled")
+
+        _ = UserSettings(defaults: defaults)
+
+        #expect(defaults.object(forKey: "useCustomPrompt") == nil)
+        #expect(defaults.object(forKey: "customPrompt") == nil)
+        #expect(defaults.object(forKey: "llmEnabled") == nil)
     }
 }
