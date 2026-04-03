@@ -57,10 +57,23 @@ public final class NoteRoutingPipelineStage: Sendable {
     private func routeCore(transcript: String, now: Date) async throws {
         let config = configProvider()
         let folder = await resolveDefaultFolder(config.defaultFolderName)
-        let body = transcript
+        var body = transcript
         let title = dateFallbackTitle(for: now)
 
-        // TODO: Task 2 — summarization
+        if config.summarizationEnabled && !transcript.isEmpty {
+            do {
+                let summary = try await summarizer.summarize(
+                    transcript: transcript,
+                    contextBudget: contextBudget
+                )
+                if !summary.isEmpty {
+                    body = summary
+                }
+            } catch {
+                logger.error("Summarization failed, using full transcript: \(error)")
+            }
+        }
+
         // TODO: Task 3 — title generation
 
         let creationResult = try await notesService.createNote(

@@ -261,4 +261,138 @@ struct NoteRoutingPipelineStageTests {
         #expect(await completeCounter.get() == 1)
         #expect(!logger.errors.isEmpty)
     }
+
+    // MARK: - Test 8: Summarization with short transcript (fits budget)
+
+    @Test
+    func summarizationOnShortTranscript() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "A summary"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(summarizer.calls.count == 1)
+        #expect(summarizer.calls[0].transcript == "Buy groceries")
+        #expect(notes.createNoteCalls[0].body == "A summary")
+        #expect(notes.createNoteCalls[0].title.hasPrefix("Voice Memo "))
+    }
+
+    // MARK: - Test 9: Summarization with long transcript (exceeds budget)
+
+    @Test
+    func summarizationOnLongTranscript() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "condensed"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: true),
+            contextBudget: tinyBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "one two three four five", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(summarizer.calls.count == 1)
+        #expect(summarizer.calls[0].transcript == "one two three four five")
+        #expect(notes.createNoteCalls[0].body == "condensed")
+    }
+
+    // MARK: - Test 10: Summarization skipped on empty transcript
+
+    @Test
+    func summarizationOnEmptyTranscript() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(summarizer.calls.isEmpty)
+        #expect(notes.createNoteCalls[0].body == "")
+    }
+
+    // MARK: - Test 11: Summarizer throws → fallback to full transcript, error logged
+
+    @Test
+    func summarizationOnSummarizerThrows() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        struct SummaryError: Error {}
+        summarizer.error = SummaryError()
+
+        let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            logger: logger,
+            config: RoutingConfiguration(summarizationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].body == "Buy groceries")
+        #expect(logger.errors.count == 1)
+    }
+
+    // MARK: - Test 12: Summarizer returns empty → fallback to full transcript
+
+    @Test
+    func summarizationOnSummarizerReturnsEmpty() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = ""
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].body == "Buy groceries")
+    }
 }
