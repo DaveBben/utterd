@@ -196,6 +196,80 @@ struct JSONMemoStoreTests {
         #expect(oldest?.fileURL == r1.fileURL)
     }
 
+    // MARK: - mostRecentlyProcessed
+
+    @Test("mostRecentlyProcessed returns nil for empty store")
+    func mostRecentlyProcessedReturnsNilForEmpty() async {
+        let store = JSONMemoStore(fileURL: makeStoreURL())
+
+        let result = await store.mostRecentlyProcessed()
+        #expect(result == nil)
+    }
+
+    @Test("mostRecentlyProcessed returns nil when all records are unprocessed")
+    func mostRecentlyProcessedReturnsNilWhenAllUnprocessed() async throws {
+        let store = JSONMemoStore(fileURL: makeStoreURL())
+
+        try await store.insert(makeRecord(path: "/memos/u1.m4a", createdAt: 100))
+        try await store.insert(makeRecord(path: "/memos/u2.m4a", createdAt: 200))
+
+        let result = await store.mostRecentlyProcessed()
+        #expect(result == nil)
+    }
+
+    @Test("mostRecentlyProcessed returns the single processed record")
+    func mostRecentlyProcessedReturnsSingleProcessedRecord() async throws {
+        let store = JSONMemoStore(fileURL: makeStoreURL())
+        let record = makeRecord(path: "/memos/p1.m4a", createdAt: 0)
+        let processedDate = Date(timeIntervalSince1970: 1_700_050_000)
+
+        try await store.insert(record)
+        try await store.markProcessed(fileURL: record.fileURL, date: processedDate)
+
+        let result = await store.mostRecentlyProcessed()
+        #expect(result?.fileURL == record.fileURL)
+        #expect(result?.dateProcessed == processedDate)
+    }
+
+    @Test("mostRecentlyProcessed returns the record with the latest dateProcessed")
+    func mostRecentlyProcessedReturnsLatestAmongMultiple() async throws {
+        let store = JSONMemoStore(fileURL: makeStoreURL())
+
+        let r1 = makeRecord(path: "/memos/q1.m4a", createdAt: 0)
+        let r2 = makeRecord(path: "/memos/q2.m4a", createdAt: 10)
+        let r3 = makeRecord(path: "/memos/q3.m4a", createdAt: 20)
+
+        let date10 = Date(timeIntervalSince1970: 1_700_010_000)
+        let date11 = Date(timeIntervalSince1970: 1_700_011_000)
+        let date12 = Date(timeIntervalSince1970: 1_700_012_000)
+
+        try await store.insert(r1)
+        try await store.insert(r2)
+        try await store.insert(r3)
+        try await store.markProcessed(fileURL: r1.fileURL, date: date10)
+        try await store.markProcessed(fileURL: r2.fileURL, date: date11)
+        try await store.markProcessed(fileURL: r3.fileURL, date: date12)
+
+        let result = await store.mostRecentlyProcessed()
+        #expect(result?.fileURL == r3.fileURL)
+    }
+
+    @Test("mostRecentlyProcessed ignores unprocessed records")
+    func mostRecentlyProcessedIgnoresUnprocessed() async throws {
+        let store = JSONMemoStore(fileURL: makeStoreURL())
+
+        let processed = makeRecord(path: "/memos/processed.m4a", createdAt: 0)
+        let unprocessed = makeRecord(path: "/memos/unprocessed.m4a", createdAt: 10)
+        let processedDate = Date(timeIntervalSince1970: 1_700_010_000)
+
+        try await store.insert(processed)
+        try await store.insert(unprocessed)
+        try await store.markProcessed(fileURL: processed.fileURL, date: processedDate)
+
+        let result = await store.mostRecentlyProcessed()
+        #expect(result?.fileURL == processed.fileURL)
+    }
+
     // MARK: - Write failure
 
     @Test("insert throws writeFailed and leaves no partial state when file is unwritable")

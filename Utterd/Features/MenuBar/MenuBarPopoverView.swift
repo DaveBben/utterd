@@ -1,8 +1,25 @@
 import SwiftUI
 
 struct MenuBarMenuContent: View {
+    @Environment(AppState.self) private var appState
+
     var body: some View {
-        Text(MenuBarStrings.title)
+        Text(MenuBarStrings.lastSyncTitle)
+            .disabled(true)
+
+        if let date = appState.lastProcessedDate {
+            Text(date, format: .dateTime.month().day().hour().minute())
+                .disabled(true)
+        } else {
+            Text(MenuBarStrings.noMemosProcessed)
+                .disabled(true)
+        }
+
+        Divider()
+
+        SettingsLink {
+            Text(MenuBarStrings.settingsButton)
+        }
 
         Divider()
 

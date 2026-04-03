@@ -85,6 +85,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let store = JSONMemoStore(fileURL: storeURL)
 
+        Task { [weak self] in
+            let record = await store.mostRecentlyProcessed()
+            await MainActor.run {
+                self?.appState?.lastProcessedDate = record?.dateProcessed
+            }
+        }
+
         let monitor = FSEventsDirectoryMonitor(directoryURL: directoryURL)
         let watcher = VoiceMemoWatcher(
             directoryURL: directoryURL,
@@ -120,16 +127,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             transcriptionService: transcriptionService,
             watcherStream: watcher.events(),
             logger: logger,
-            makeRoutingStage: { onComplete in
-                NoteRoutingPipelineStage(
+            makeRoutingStage: { [weak self] onComplete in
+                let wrappedOnComplete: @Sendable () async -> Void = {
+                    await MainActor.run { self?.appState?.lastProcessedDate = Date() }
+                    await onComplete()
+                }
+                let configProvider: @Sendable () -> RoutingConfiguration = {
+                    UserSettings.readRoutingConfiguration()
+                }
+                return NoteRoutingPipelineStage(
                     notesService: notesService,
                     llmService: llmService,
                     summarizer: summarizer,
                     store: store,
                     logger: logger,
-                    mode: .routeOnly,
+                    configProvider: configProvider,
                     contextBudget: contextBudget,
-                    onComplete: onComplete
+                    onComplete: wrappedOnComplete
                 )
             }
         )

@@ -4,16 +4,55 @@ import Foundation
 /// from the provided hierarchy (or fall back to "GENERAL NOTES").
 public struct TranscriptClassifier {
 
+    /// Template for custom prompts. Mirrors the built-in prompt structure but uses
+    /// `{notes_folders}` as a placeholder for the dynamic folder list.
+    public static let defaultCustomPrompt = """
+        Pick the best folder for a voice memo. Reply with exactly two lines: the folder path, then a short title.
+
+        Folders:
+        {notes_folders}
+        - GENERAL NOTES
+
+        Examples:
+
+        Transcript: "I had this idea for a fitness app that uses your camera to count reps"
+        Ideas
+        Fitness Rep Counter App
+
+        Transcript: "In the Monday sync we went over the launch timeline with the team"
+        Work
+        Monday Launch Timeline Sync
+
+        Transcript: "Pick up the best folder that matches the topic. If nothing fits, use GENERAL NOTES"
+        GENERAL NOTES
+        Folder Selection Reminder
+
+        Now classify this transcript. Two lines only: folder path, then title.
+        """
+
     /// Classifies the transcript and returns a folder path (or nil for general)
     /// plus a short title. The `now` date is used only to generate fallback titles
     /// when the LLM response contains no usable title.
+    ///
+    /// Pass `customSystemPrompt` to override the built-in prompt. The placeholder
+    /// `{notes_folders}` is replaced with the list of top-level folder names.
     public static func classify(
         transcript: String,
         hierarchy: [FolderHierarchyEntry],
         using llm: any LLMService,
+        customSystemPrompt: String? = nil,
         now: Date
     ) async throws -> NoteClassificationResult {
-        let systemPrompt = buildSystemPrompt(hierarchy: hierarchy)
+        let systemPrompt: String
+        if let customSystemPrompt {
+            let topLevelFolders = hierarchy
+                .filter { $0.path == $0.folder.name }
+                .map { "- \($0.folder.name)" }
+                .joined(separator: "\n")
+            systemPrompt = customSystemPrompt.replacingOccurrences(of: "{notes_folders}", with: topLevelFolders)
+        } else {
+            systemPrompt = buildSystemPrompt(hierarchy: hierarchy)
+        }
         let response = try await llm.generate(systemPrompt: systemPrompt, userPrompt: transcript)
         return parse(response: response, hierarchy: hierarchy, now: now)
     }
