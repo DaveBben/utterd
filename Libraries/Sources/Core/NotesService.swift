@@ -10,16 +10,12 @@ public enum NotesServiceError: Error, Sendable {
 
 /// Abstracts Apple Notes operations so tests can inject a mock.
 ///
-/// - ``listFolders(in:)`` discovers the user's folder structure (US-01).
-/// - ``resolveHierarchy(for:)`` returns the root-to-leaf path for a folder (US-01).
-/// - ``createNote(title:body:in:)`` creates a note, with fallback (US-02).
-/// - ``noteExists(title:in:)`` verifies a note exists — test support only (US-03).
+/// - ``listFolders(in:)`` discovers the user's folder structure.
+/// - ``createNote(title:body:in:)`` creates a note, with fallback.
+/// - ``noteExists(title:in:)`` verifies a note exists — test support only.
 public protocol NotesService: Sendable {
     /// Returns the immediate child folders of `parent`, or top-level folders when `parent` is `nil`.
     func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder]
-
-    /// Returns the folder path from root to `folder` in root-to-leaf order.
-    func resolveHierarchy(for folder: NotesFolder) async throws -> [NotesFolder]
 
     /// Creates a note in `folder`, or the default folder when `folder` is `nil`.
     /// Returns `.createdInDefaultFolder` if the specified folder no longer exists.

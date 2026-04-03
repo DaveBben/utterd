@@ -24,20 +24,6 @@ final class MockNotesService: NotesService, @unchecked Sendable {
         return listFoldersResult
     }
 
-    // MARK: - resolveHierarchy
-
-    nonisolated(unsafe) var resolveHierarchyResult: [NotesFolder] = []
-    nonisolated(unsafe) var resolveHierarchyError: Error?
-    nonisolated(unsafe) var resolveHierarchyCalls: [NotesFolder] = []
-
-    func resolveHierarchy(for folder: NotesFolder) async throws -> [NotesFolder] {
-        resolveHierarchyCalls.append(folder)
-        if let error = resolveHierarchyError {
-            throw error
-        }
-        return resolveHierarchyResult
-    }
-
     // MARK: - createNote
 
     nonisolated(unsafe) var createNoteResult: NoteCreationResult = .created
