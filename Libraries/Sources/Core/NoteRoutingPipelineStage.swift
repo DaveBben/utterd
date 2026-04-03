@@ -58,7 +58,7 @@ public final class NoteRoutingPipelineStage: Sendable {
         let config = configProvider()
         let folder = await resolveDefaultFolder(config.defaultFolderName)
         var body = transcript
-        let title = dateFallbackTitle(for: now)
+        var title = dateFallbackTitle(for: now)
 
         if config.summarizationEnabled && !transcript.isEmpty {
             do {
@@ -74,7 +74,23 @@ public final class NoteRoutingPipelineStage: Sendable {
             }
         }
 
-        // TODO: Task 3 — title generation
+        if config.titleGenerationEnabled && !transcript.isEmpty {
+            do {
+                let truncatedInput = transcript.split(separator: " ").prefix(2000).joined(separator: " ")
+                let systemPrompt = "Generate a short descriptive title for this voice memo transcript. Return only the title, nothing else."
+                let response = try await llmService.generate(
+                    systemPrompt: systemPrompt,
+                    userPrompt: truncatedInput
+                )
+                let firstLine = response.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? ""
+                let sanitized = String(firstLine.filter { !$0.isNewline && $0 != "\0" && $0 != "\t" }.prefix(100))
+                if !sanitized.isEmpty {
+                    title = sanitized
+                }
+            } catch {
+                logger.error("Title generation failed, using date-based title: \(error)")
+            }
+        }
 
         let creationResult = try await notesService.createNote(
             title: title,

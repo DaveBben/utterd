@@ -395,4 +395,321 @@ struct NoteRoutingPipelineStageTests {
 
         #expect(notes.createNoteCalls[0].body == "Buy groceries")
     }
+
+    // MARK: - Test 13: Title generation with normal transcript
+
+    @Test
+    func titleGenOnNormalTranscript() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "Grocery Shopping"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls.count == 1)
+        #expect(llm.calls[0].systemPrompt.lowercased().contains("title"))
+        #expect(llm.calls[0].userPrompt == "Buy groceries")
+        #expect(notes.createNoteCalls[0].title == "Grocery Shopping")
+    }
+
+    // MARK: - Test 14: Title generation truncates transcript to 2000 words
+
+    @Test
+    func titleGenOnTranscriptOver2KWords() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "Long Document"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let longTranscript = (1...3000).map { "word\($0)" }.joined(separator: " ")
+        let result = TranscriptionResult(transcript: longTranscript, fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls[0].userPrompt.split(separator: " ").count == 2000)
+    }
+
+    // MARK: - Test 15: Both summarization and title generation on normal transcript
+
+    @Test
+    func bothOnNormalTranscript() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "A summary"
+
+        let llm = MockLLMService()
+        llm.result = "Meeting Notes"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(summarizer.calls.count == 1)
+        #expect(llm.calls.count == 1)
+        #expect(notes.createNoteCalls[0].body == "A summary")
+        #expect(notes.createNoteCalls[0].title == "Meeting Notes")
+    }
+
+    // MARK: - Test 16: Title generation skipped on empty transcript
+
+    @Test
+    func titleGenOnEmptyTranscript() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls.isEmpty)
+        #expect(notes.createNoteCalls[0].title.hasPrefix("Voice Memo "))
+    }
+
+    // MARK: - Test 17: Title generation falls back to date title when LLM throws
+
+    @Test
+    func titleGenOnLLMThrows() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        struct SomeError: Error {}
+        llm.error = SomeError()
+
+        let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            logger: logger,
+            config: RoutingConfiguration(titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].title.hasPrefix("Voice Memo "))
+        #expect(logger.errors.count == 1)
+    }
+
+    // MARK: - Test 18: Summarization succeeds, title generation fails
+
+    @Test
+    func bothOnSummarizeSucceedsTitleFails() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "A summary"
+
+        let llm = MockLLMService()
+        struct SomeError: Error {}
+        llm.error = SomeError()
+
+        let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            summarizer: summarizer,
+            store: store,
+            logger: logger,
+            config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].body == "A summary")
+        #expect(notes.createNoteCalls[0].title.hasPrefix("Voice Memo "))
+        #expect(logger.errors.count == 1)
+    }
+
+    // MARK: - Test 19: Summarization fails, title generation succeeds
+
+    @Test
+    func bothOnSummarizeFailsTitleSucceeds() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        struct SomeError: Error {}
+        summarizer.error = SomeError()
+
+        let llm = MockLLMService()
+        llm.result = "Grocery List"
+
+        let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            summarizer: summarizer,
+            store: store,
+            logger: logger,
+            config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].body == "Buy groceries")
+        #expect(notes.createNoteCalls[0].title == "Grocery List")
+        #expect(logger.errors.count == 1)
+    }
+
+    // MARK: - Test 20: LLM returns empty string → date fallback title
+
+    @Test
+    func titleGenOnLLMReturnsEmpty() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = ""
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].title.hasPrefix("Voice Memo "))
+    }
+
+    // MARK: - Test 21: LLM returns 150-char title → truncated to 100
+
+    @Test
+    func titleGenOnLLMReturns150Chars() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = String(repeating: "A", count: 150)
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].title.count == 100)
+    }
+
+    // MARK: - Test 22: LLM returns multi-line response → first line used
+
+    @Test
+    func titleGenOnLLMReturnsMultiLine() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "Line1\n\nLine3"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].title == "Line1")
+    }
+
+    // MARK: - Test 23: Both summarization and title generation both throw
+
+    @Test
+    func bothOnBothThrow() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        struct SomeError: Error {}
+        summarizer.error = SomeError()
+
+        let llm = MockLLMService()
+        llm.error = SomeError()
+
+        let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            summarizer: summarizer,
+            store: store,
+            logger: logger,
+            config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls[0].body == "Buy groceries")
+        #expect(notes.createNoteCalls[0].title.hasPrefix("Voice Memo "))
+        #expect(logger.errors.count >= 2)
+    }
 }
