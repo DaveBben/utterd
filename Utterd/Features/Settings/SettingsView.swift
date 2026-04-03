@@ -54,7 +54,7 @@ struct SettingsView: View {
 
                     if settings.useCustomPrompt {
                         TextEditor(text: $settings.customPrompt)
-                            .frame(minHeight: 120)
+                            .frame(minHeight: 150)
                             .font(.body.monospaced())
 
                         Button("Reset to Default") {
@@ -66,6 +66,8 @@ struct SettingsView: View {
                 }
             }
         }
+        .formStyle(.grouped)
+        .frame(width: 480, height: settings.llmEnabled && settings.useCustomPrompt ? 520 : 300)
         .task {
             let routingModel = SettingsRoutingModel(notesService: notesService, settings: settings)
             model = routingModel

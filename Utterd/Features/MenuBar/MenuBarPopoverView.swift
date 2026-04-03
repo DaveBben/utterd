@@ -8,7 +8,7 @@ struct MenuBarMenuContent: View {
             .disabled(true)
 
         if let date = appState.lastProcessedDate {
-            Text(date, style: .relative)
+            Text(date, format: .dateTime.month().day().hour().minute())
                 .disabled(true)
         } else {
             Text(MenuBarStrings.noMemosProcessed)
@@ -17,9 +17,8 @@ struct MenuBarMenuContent: View {
 
         Divider()
 
-        Button(MenuBarStrings.settingsButton) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            NSApp.activate()
+        SettingsLink {
+            Text(MenuBarStrings.settingsButton)
         }
 
         Divider()
