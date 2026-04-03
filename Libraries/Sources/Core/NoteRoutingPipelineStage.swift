@@ -56,11 +56,13 @@ public final class NoteRoutingPipelineStage: Sendable {
 
     private func routeCore(transcript: String, now: Date) async throws {
         let config = configProvider()
+        logger.info("Routing started — summarization: \(config.summarizationEnabled), title generation: \(config.titleGenerationEnabled), default folder: \(config.defaultFolderName ?? "(system default)")")
         let folder = await resolveDefaultFolder(config.defaultFolderName)
         var body = transcript
         var title = dateFallbackTitle(for: now)
 
         if config.summarizationEnabled && !transcript.isEmpty {
+            logger.info("LLM summarization started")
             do {
                 let summary = try await summarizer.summarize(
                     transcript: transcript,
@@ -69,12 +71,14 @@ public final class NoteRoutingPipelineStage: Sendable {
                 if !summary.isEmpty {
                     body = summary
                 }
+                logger.info("LLM summarization completed (\(body.count) chars)")
             } catch {
                 logger.error("Summarization failed, using full transcript: \(error)")
             }
         }
 
         if config.titleGenerationEnabled && !transcript.isEmpty {
+            logger.info("LLM title generation started")
             do {
                 let truncatedInput = transcript.split(separator: " ").prefix(2000).joined(separator: " ")
                 let systemPrompt = "Generate a short descriptive title for this voice memo transcript. Return only the title, nothing else."
@@ -87,11 +91,13 @@ public final class NoteRoutingPipelineStage: Sendable {
                 if !sanitized.isEmpty {
                     title = sanitized
                 }
+                logger.info("LLM title generation completed — title: \(title)")
             } catch {
                 logger.error("Title generation failed, using date-based title: \(error)")
             }
         }
 
+        logger.info("Creating note '\(title)' in \(folder?.name ?? "system default folder") (\(body.count) char body)")
         let creationResult = try await notesService.createNote(
             title: title,
             body: body,
@@ -100,6 +106,7 @@ public final class NoteRoutingPipelineStage: Sendable {
         if case .createdInDefaultFolder(let reason) = creationResult {
             logger.warning("Note created in default folder: \(reason)")
         }
+        logger.info("Note created successfully")
     }
 
     private func resolveDefaultFolder(_ name: String?) async -> NotesFolder? {
