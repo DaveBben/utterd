@@ -23,8 +23,12 @@ struct SettingsView: View {
             Section("Routing") {
                 Picker("Default Folder", selection: $settings.defaultFolderName) {
                     Text("System Default").tag(String?.none)
-                    ForEach(model?.folders ?? [], id: \.id) { folder in
-                        Text(folder.name).tag(Optional(folder.name))
+                    if let folders = model?.folders, !folders.isEmpty {
+                        ForEach(folders, id: \.id) { folder in
+                            Text(folder.name).tag(Optional(folder.name))
+                        }
+                    } else if let name = settings.defaultFolderName {
+                        Text(name).tag(Optional(name))
                     }
                 }
 

@@ -78,7 +78,6 @@ public final class NoteRoutingPipelineStage: Sendable {
         }
 
         if config.titleGenerationEnabled && !transcript.isEmpty {
-            logger.info("LLM title generation started")
             do {
                 let truncatedInput = transcript.split(separator: " ").prefix(2000).joined(separator: " ")
                 let systemPrompt = "Generate a short descriptive title for this voice memo transcript. Return only the title, nothing else."
@@ -91,7 +90,6 @@ public final class NoteRoutingPipelineStage: Sendable {
                 if !sanitized.isEmpty {
                     title = sanitized
                 }
-                logger.info("LLM title generation completed — title: \(title)")
             } catch {
                 logger.error("Title generation failed, using date-based title: \(error)")
             }
