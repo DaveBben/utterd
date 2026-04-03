@@ -103,7 +103,7 @@ public final class NoteRoutingPipelineStage: Sendable {
     }
 
     private func resolveDefaultFolder(_ name: String?) async -> NotesFolder? {
-        guard let name else { return nil }
+        guard let name, !name.isEmpty else { return nil }
         do {
             let folders = try await notesService.listFolders(in: nil)
             return folders.first { $0.name == name }
