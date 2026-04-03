@@ -190,6 +190,6 @@ public final class NoteRoutingPipelineStage: Sendable {
 
     private func resolveDefaultFolder(_ name: String?, from hierarchy: [FolderHierarchyEntry]) -> NotesFolder? {
         guard let name else { return nil }
-        return hierarchy.filter { !$0.path.contains(".") }.first { $0.folder.name == name }?.folder
+        return hierarchy.filter { $0.path == $0.folder.name }.first { $0.folder.name == name }?.folder
     }
 }

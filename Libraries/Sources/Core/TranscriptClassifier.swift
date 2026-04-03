@@ -46,7 +46,7 @@ public struct TranscriptClassifier {
         let systemPrompt: String
         if let customSystemPrompt {
             let topLevelFolders = hierarchy
-                .filter { !$0.path.contains(".") }
+                .filter { $0.path == $0.folder.name }
                 .map { "- \($0.folder.name)" }
                 .joined(separator: "\n")
             systemPrompt = customSystemPrompt.replacingOccurrences(of: "{notes_folders}", with: topLevelFolders)
