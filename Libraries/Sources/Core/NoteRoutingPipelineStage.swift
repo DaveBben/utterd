@@ -75,7 +75,13 @@ public final class NoteRoutingPipelineStage: Sendable {
         let config = configProvider()
         let mode: RoutingMode = config.summarizationEnabled ? .routeAndSummarize : .routeOnly
 
-        let hierarchy = (try? await folderCache.get(using: notesService, ttl: .seconds(300))) ?? []
+        let hierarchy: [FolderHierarchyEntry]
+        do {
+            hierarchy = try await folderCache.get(using: notesService, ttl: .seconds(300))
+        } catch {
+            logger.warning("Folder hierarchy fetch failed, using system default: \(error)")
+            hierarchy = []
+        }
         let defaultFolder = resolveDefaultFolder(config.defaultFolderName, from: hierarchy)
 
         switch config.llmApproach {
@@ -91,7 +97,7 @@ public final class NoteRoutingPipelineStage: Sendable {
             _ = try await notesService.createNote(
                 title: dateFallbackTitle(for: now),
                 body: transcript,
-                in: nil
+                in: defaultFolder
             )
             return
 

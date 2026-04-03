@@ -133,25 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     await onComplete()
                 }
                 let configProvider: @Sendable () -> RoutingConfiguration = {
-                    let defaults = UserDefaults.standard
-                    let llmEnabled = defaults.bool(forKey: UserSettings.Keys.llmEnabled)
-                    let useCustomPrompt = defaults.bool(forKey: UserSettings.Keys.useCustomPrompt)
-                    let customPrompt = defaults.string(forKey: UserSettings.Keys.customPrompt) ?? TranscriptClassifier.defaultCustomPrompt
-                    let summarizationEnabled = defaults.bool(forKey: UserSettings.Keys.summarizationEnabled)
-                    let defaultFolderName = defaults.string(forKey: UserSettings.Keys.defaultFolderName)
-                    let approach: RoutingConfiguration.LLMApproach
-                    if !llmEnabled {
-                        approach = .disabled
-                    } else if useCustomPrompt {
-                        approach = .customPrompt(customPrompt)
-                    } else {
-                        approach = .autoRoute
-                    }
-                    return RoutingConfiguration(
-                        llmApproach: approach,
-                        defaultFolderName: defaultFolderName,
-                        summarizationEnabled: summarizationEnabled
-                    )
+                    UserSettings.readRoutingConfiguration()
                 }
                 return NoteRoutingPipelineStage(
                     notesService: notesService,

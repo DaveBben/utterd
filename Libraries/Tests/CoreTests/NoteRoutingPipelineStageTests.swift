@@ -706,7 +706,7 @@ struct NoteRoutingPipelineStageTests {
     }
 
     @Test
-    func emptyCustomPromptSkipsLLMAndRoutesToDefault() async throws {
+    func emptyCustomPromptSkipsLLMAndRoutesToDefaultFolder() async throws {
         let personal = makePersonalFolder()
         let notes = MockNotesService()
         notes.listFoldersByParent = [nil: [personal], "personal": []]
@@ -718,7 +718,7 @@ struct NoteRoutingPipelineStageTests {
             notesService: notes,
             llmService: llm,
             store: store,
-            config: RoutingConfiguration(llmApproach: .customPrompt("")),
+            config: RoutingConfiguration(llmApproach: .customPrompt(""), defaultFolderName: "personal"),
             contextBudget: smallBudget()
         )
 
@@ -727,7 +727,7 @@ struct NoteRoutingPipelineStageTests {
 
         #expect(llm.calls.isEmpty)
         #expect(notes.createNoteCalls.count == 1)
-        #expect(notes.createNoteCalls[0].folder == nil)
+        #expect(notes.createNoteCalls[0].folder == personal)
     }
 
     // MARK: - summarizationEnabled flag

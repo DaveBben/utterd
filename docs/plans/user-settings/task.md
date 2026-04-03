@@ -2,7 +2,7 @@
 
 **Plan**: docs/plans/user-settings/plan.md
 **Date**: 2026-04-02
-**Status**: Approved
+**Status**: In Progress
 
 ---
 

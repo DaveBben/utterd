@@ -16,11 +16,11 @@ public struct TranscriptClassifier {
         Examples:
 
         Transcript: "I had this idea for a fitness app that uses your camera to count reps"
-        Ideas.App Ideas
+        Ideas
         Fitness Rep Counter App
 
         Transcript: "In the Monday sync we went over the launch timeline with the team"
-        Work.Meetings
+        Work
         Monday Launch Timeline Sync
 
         Transcript: "Pick up the best folder that matches the topic. If nothing fits, use GENERAL NOTES"

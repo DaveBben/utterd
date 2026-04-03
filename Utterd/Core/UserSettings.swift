@@ -81,6 +81,15 @@ final class UserSettings {
     }
 
     func toRoutingConfiguration() -> RoutingConfiguration {
+        UserSettings.readRoutingConfiguration(from: defaults)
+    }
+
+    nonisolated static func readRoutingConfiguration(from defaults: UserDefaults = .standard) -> RoutingConfiguration {
+        let llmEnabled = defaults.bool(forKey: Keys.llmEnabled)
+        let useCustomPrompt = defaults.bool(forKey: Keys.useCustomPrompt)
+        let customPrompt = defaults.string(forKey: Keys.customPrompt) ?? TranscriptClassifier.defaultCustomPrompt
+        let summarizationEnabled = defaults.bool(forKey: Keys.summarizationEnabled)
+        let defaultFolderName = defaults.string(forKey: Keys.defaultFolderName)
         let approach: RoutingConfiguration.LLMApproach
         if !llmEnabled {
             approach = .disabled
