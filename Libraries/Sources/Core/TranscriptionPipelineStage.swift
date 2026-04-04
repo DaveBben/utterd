@@ -36,11 +36,17 @@ public final class TranscriptionPipelineStage: Sendable {
         }
 
         do {
+            try Task.checkCancellation()
             let serviceResult = try await transcriptionService.transcribe(fileURL: tempURL)
             cleanUpTempFile(at: tempURL)
+            try Task.checkCancellation()
             let result = TranscriptionResult(transcript: serviceResult.transcript, fileURL: record.fileURL)
             logger.info("Transcription complete for \(record.fileURL.lastPathComponent): \(result.transcript.count) characters")
             return result
+        } catch is CancellationError {
+            logger.info("TranscriptionPipelineStage: cancelled for \(record.fileURL.lastPathComponent)")
+            cleanUpTempFile(at: tempURL)
+            return nil
         } catch {
             logger.error("TranscriptionPipelineStage: transcription failed for \(record.fileURL.lastPathComponent): \(error)")
             cleanUpTempFile(at: tempURL)

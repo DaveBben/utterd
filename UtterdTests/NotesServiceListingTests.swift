@@ -6,10 +6,11 @@ import Testing
 struct NotesServiceListingTests {
     // MARK: - AC-01.1: listFolders(in: nil) parses top-level folders
 
-    @Test("listFolders(in: nil) parses tab-delimited output into NotesFolder structs")
+    @Test("listFolders(in: nil) parses delimited output into NotesFolder structs")
     func listFoldersTopLevel() async throws {
         let mock = MockScriptExecutor()
-        mock.executeResults = [.success("id1\tFinance\t\nid2\tPersonal\t\n")]
+        let d = "\u{001E}"
+        mock.executeResults = [.success("id1\(d)Finance\(d)\nid2\(d)Personal\(d)\n")]
         let service = AppleScriptNotesService(executor: mock)
 
         let folders = try await service.listFolders(in: nil)
@@ -28,7 +29,8 @@ struct NotesServiceListingTests {
     @Test("listFolders(in: parent) constructs script referencing parent folder ID")
     func listFoldersWithParent() async throws {
         let mock = MockScriptExecutor()
-        mock.executeResults = [.success("childId\tTaxes\tparentId\n")]
+        let d = "\u{001E}"
+        mock.executeResults = [.success("childId\(d)Taxes\(d)parentId\n")]
         let service = AppleScriptNotesService(executor: mock)
         let parent = NotesFolder(id: "parentId", name: "Finance", containerID: nil)
 

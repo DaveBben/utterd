@@ -98,9 +98,9 @@ struct PipelineControllerTests {
         #expect(service.transcribeCalls.count >= 2)
     }
 
-    // MARK: - On transcription success, handler returns true
+    // MARK: - On transcription success without routing stage
 
-    @Test func transcriptionSuccessReturnsTrue() async throws {
+    @Test func transcriptionSuccessWithoutRoutingStageMarksProcessed() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
@@ -127,42 +127,11 @@ struct PipelineControllerTests {
         try await Task.sleep(for: .milliseconds(100))
         controller.stop()
 
-        // Transcription was called at least once and succeeded
         #expect(service.transcribeCalls.count >= 1)
-        // With no routing stage, "awaiting stage 2" should appear
-        #expect(logger.infos.contains { $0.contains("awaiting stage 2") })
-    }
-
-    // MARK: - onResult logs "awaiting stage 2"
-
-    @Test func onResultLogsAwaitingStage2() async throws {
-        let dir = try tempDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let fileURL = try makeRealFile(in: dir)
-        let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
-
-        let store = MockMemoStore()
-        await store.setOldestUnprocessed(record)
-
-        let service = MockTranscriptionService()
-        service.result = TranscriptionResult(transcript: "note to self", fileURL: fileURL)
-
-        let logger = MockWatcherLogger()
-
-        let controller = PipelineController(
-            store: store,
-            transcriptionService: service,
-            watcherStream: makeEmptyStream(),
-            logger: logger,
-            clock: ImmediateClock()
-        )
-
-        await controller.start()
-        try await Task.sleep(for: .milliseconds(100))
-        controller.stop()
-
-        #expect(logger.infos.contains { $0.contains("awaiting stage 2") })
+        // Without routing stage, record should be marked processed
+        let markProcessedCalls = await store.markProcessedCalls
+        #expect(markProcessedCalls.count >= 1)
+        #expect(logger.infos.contains { $0.contains("no routing stage") })
     }
 
     // MARK: - Stage 2 wiring with routing stage factory
@@ -218,7 +187,7 @@ struct PipelineControllerTests {
         #expect(!logger.infos.contains { $0.contains("awaiting stage 2") })
     }
 
-    @Test func nilRoutingStageFactoryLogsAwaitingStage2() async throws {
+    @Test func nilRoutingStageMarksProcessedAndReleasesLock() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
@@ -246,7 +215,13 @@ struct PipelineControllerTests {
         try await Task.sleep(for: .milliseconds(100))
         controller.stop()
 
-        #expect(logger.infos.contains { $0.contains("awaiting stage 2") })
+        // Without a routing stage, the controller should mark the record processed
+        let markProcessedCalls = await store.markProcessedCalls
+        #expect(markProcessedCalls.count >= 1)
+        #expect(markProcessedCalls.first?.fileURL == fileURL)
+
+        // Should log the no-routing-stage message
+        #expect(logger.infos.contains { $0.contains("no routing stage") })
     }
 
     @Test func endToEndStage1ToStage2MarksProcessedAndReleasesLock() async throws {

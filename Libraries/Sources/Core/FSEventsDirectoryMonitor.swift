@@ -24,7 +24,7 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
     }
 
     deinit {
-        stopOnQueue()
+        queue.sync { stopOnQueue() }
     }
 
     // MARK: - DirectoryMonitor
@@ -84,7 +84,7 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
         queue.sync { stopOnQueue() }
     }
 
-    // Must be called on `queue` (or from `deinit` where no races are possible).
+    // Must be called on `queue`.
     private func stopOnQueue() {
         guard isRunning else { return }
         isRunning = false

@@ -83,11 +83,11 @@ public final class VoiceMemoWatcher {
     public func events() -> AsyncStream<VoiceMemoEvent> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<VoiceMemoEvent>.makeStream(
-            bufferingPolicy: .bufferingOldest(16)
+            bufferingPolicy: .unbounded
         )
         continuations[id] = continuation
         continuation.onTermination = { [weak self] _ in
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
                 self?.continuations.removeValue(forKey: id)
             }
         }
@@ -169,6 +169,8 @@ public final class VoiceMemoWatcher {
                 emittedPaths.insert(url)
                 broadcast(event)
                 logger.info("Detected \(url.lastPathComponent) (\(size) bytes)")
+            } else if url.pathExtension.lowercased() == "m4a" && !url.lastPathComponent.hasPrefix(".") && size <= 1024 {
+                logger.info("Skipped \(url.lastPathComponent) — \(size) bytes below 1024-byte threshold (likely iCloud stub)")
             }
         }
     }

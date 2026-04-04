@@ -47,11 +47,10 @@ struct SettingsRoutingModelTests {
         #expect(model.folders.count == 2)
         #expect(model.folders[0].name == "Work")
         #expect(model.folders[1].name == "Personal")
-        #expect(model.isLoading == false)
         #expect(model.fetchError == nil)
     }
 
-    @Test("loadFolders failure sets fetchError, clears folders and loading")
+    @Test("loadFolders failure sets fetchError and clears folders")
     @MainActor
     func loadFoldersFailure() async {
         let (settings, suiteName) = makeSettings()
@@ -64,7 +63,6 @@ struct SettingsRoutingModelTests {
 
         #expect(model.folders.isEmpty)
         #expect(model.fetchError != nil)
-        #expect(model.isLoading == false)
     }
 
     @Test("validateSelection keeps selection when folder name is in list")

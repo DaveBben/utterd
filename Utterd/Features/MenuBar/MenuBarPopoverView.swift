@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarMenuContent: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Text(MenuBarStrings.lastSyncTitle)
@@ -17,8 +18,11 @@ struct MenuBarMenuContent: View {
 
         Divider()
 
-        SettingsLink {
-            Text(MenuBarStrings.settingsButton)
+        Button(MenuBarStrings.settingsButton) {
+            // NSApp.activate() is required for menu-bar-only apps — without it,
+            // the Settings window won't reappear after being closed.
+            NSApp.activate()
+            openSettings()
         }
 
         Divider()

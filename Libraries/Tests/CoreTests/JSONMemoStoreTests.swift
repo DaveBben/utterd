@@ -25,7 +25,7 @@ struct JSONMemoStoreTests {
     @Test("Insert new record: persisted and contains returns true")
     func insertNewRecord() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let record = makeRecord(path: "/memos/a.m4a")
 
         try await store.insert(record)
@@ -37,14 +37,14 @@ struct JSONMemoStoreTests {
     @Test("Insert duplicate: no-op, no error, no duplicate record")
     func insertDuplicateIsNoOp() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let record = makeRecord(path: "/memos/a.m4a")
 
         try await store.insert(record)
         try await store.insert(record) // second insert — should be silent no-op
 
         // Reload from disk and verify only one record
-        let reloaded = JSONMemoStore(fileURL: storeURL)
+        let reloaded = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let oldest = await reloaded.oldestUnprocessed()
         #expect(oldest?.fileURL == record.fileURL)
 
@@ -58,7 +58,7 @@ struct JSONMemoStoreTests {
     @Test("contains returns false for missing URL")
     func containsReturnsFalseForMissingURL() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let url = URL(fileURLWithPath: "/memos/missing.m4a")
 
         let found = await store.contains(fileURL: url)
@@ -68,7 +68,7 @@ struct JSONMemoStoreTests {
     @Test("contains returns true for existing URL")
     func containsReturnsTrueForExistingURL() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let record = makeRecord(path: "/memos/b.m4a")
 
         try await store.insert(record)
@@ -82,7 +82,7 @@ struct JSONMemoStoreTests {
     @Test("oldestUnprocessed returns record created earliest")
     func oldestUnprocessedReturnsEarliest() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
 
         let r1 = makeRecord(path: "/memos/r1.m4a", createdAt: 100)
         let r2 = makeRecord(path: "/memos/r2.m4a", createdAt: 200)
@@ -100,7 +100,7 @@ struct JSONMemoStoreTests {
     @Test("oldestUnprocessed returns nil when all records are processed")
     func oldestUnprocessedReturnsNilWhenAllProcessed() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let processed = Date(timeIntervalSince1970: 1_700_099_000)
 
         let r1 = MemoRecord(
@@ -117,7 +117,7 @@ struct JSONMemoStoreTests {
     @Test("oldestUnprocessed returns nil for empty store")
     func oldestUnprocessedReturnsNilForEmpty() async {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
 
         let oldest = await store.oldestUnprocessed()
         #expect(oldest == nil)
@@ -128,7 +128,7 @@ struct JSONMemoStoreTests {
     @Test("markProcessed sets dateProcessed and persists to disk")
     func markProcessedSetsDatesAndPersists() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let record = makeRecord(path: "/memos/c.m4a")
         let processedDate = Date(timeIntervalSince1970: 1_700_099_000)
 
@@ -136,7 +136,7 @@ struct JSONMemoStoreTests {
         try await store.markProcessed(fileURL: record.fileURL, date: processedDate)
 
         // Reload from disk and verify
-        let reloaded = JSONMemoStore(fileURL: storeURL)
+        let reloaded = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let oldest = await reloaded.oldestUnprocessed()
         #expect(oldest == nil) // should be nil since it's now processed
 
@@ -147,7 +147,7 @@ struct JSONMemoStoreTests {
     @Test("markProcessed throws recordNotFound for unknown URL")
     func markProcessedThrowsForUnknownURL() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let missingURL = URL(fileURLWithPath: "/memos/nope.m4a")
 
         await #expect(throws: MemoStoreError.self) {
@@ -158,7 +158,7 @@ struct JSONMemoStoreTests {
     @Test("markProcessed throws recordNotFound with the correct URL")
     func markProcessedThrowsWithCorrectURL() async throws {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let missingURL = URL(fileURLWithPath: "/memos/nope.m4a")
 
         do {
@@ -180,12 +180,12 @@ struct JSONMemoStoreTests {
         let r2 = makeRecord(path: "/memos/persist2.m4a", createdAt: 10)
 
         // Write with first instance
-        let store1 = JSONMemoStore(fileURL: storeURL)
+        let store1 = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         try await store1.insert(r1)
         try await store1.insert(r2)
 
         // Read with a new instance
-        let store2 = JSONMemoStore(fileURL: storeURL)
+        let store2 = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let foundR1 = await store2.contains(fileURL: r1.fileURL)
         let foundR2 = await store2.contains(fileURL: r2.fileURL)
 
@@ -200,7 +200,7 @@ struct JSONMemoStoreTests {
 
     @Test("mostRecentlyProcessed returns nil for empty store")
     func mostRecentlyProcessedReturnsNilForEmpty() async {
-        let store = JSONMemoStore(fileURL: makeStoreURL())
+        let store = JSONMemoStore(fileURL: makeStoreURL(), logger: MockWatcherLogger())
 
         let result = await store.mostRecentlyProcessed()
         #expect(result == nil)
@@ -208,7 +208,7 @@ struct JSONMemoStoreTests {
 
     @Test("mostRecentlyProcessed returns nil when all records are unprocessed")
     func mostRecentlyProcessedReturnsNilWhenAllUnprocessed() async throws {
-        let store = JSONMemoStore(fileURL: makeStoreURL())
+        let store = JSONMemoStore(fileURL: makeStoreURL(), logger: MockWatcherLogger())
 
         try await store.insert(makeRecord(path: "/memos/u1.m4a", createdAt: 100))
         try await store.insert(makeRecord(path: "/memos/u2.m4a", createdAt: 200))
@@ -219,7 +219,7 @@ struct JSONMemoStoreTests {
 
     @Test("mostRecentlyProcessed returns the single processed record")
     func mostRecentlyProcessedReturnsSingleProcessedRecord() async throws {
-        let store = JSONMemoStore(fileURL: makeStoreURL())
+        let store = JSONMemoStore(fileURL: makeStoreURL(), logger: MockWatcherLogger())
         let record = makeRecord(path: "/memos/p1.m4a", createdAt: 0)
         let processedDate = Date(timeIntervalSince1970: 1_700_050_000)
 
@@ -233,7 +233,7 @@ struct JSONMemoStoreTests {
 
     @Test("mostRecentlyProcessed returns the record with the latest dateProcessed")
     func mostRecentlyProcessedReturnsLatestAmongMultiple() async throws {
-        let store = JSONMemoStore(fileURL: makeStoreURL())
+        let store = JSONMemoStore(fileURL: makeStoreURL(), logger: MockWatcherLogger())
 
         let r1 = makeRecord(path: "/memos/q1.m4a", createdAt: 0)
         let r2 = makeRecord(path: "/memos/q2.m4a", createdAt: 10)
@@ -256,7 +256,7 @@ struct JSONMemoStoreTests {
 
     @Test("mostRecentlyProcessed ignores unprocessed records")
     func mostRecentlyProcessedIgnoresUnprocessed() async throws {
-        let store = JSONMemoStore(fileURL: makeStoreURL())
+        let store = JSONMemoStore(fileURL: makeStoreURL(), logger: MockWatcherLogger())
 
         let processed = makeRecord(path: "/memos/processed.m4a", createdAt: 0)
         let unprocessed = makeRecord(path: "/memos/unprocessed.m4a", createdAt: 10)
@@ -277,7 +277,7 @@ struct JSONMemoStoreTests {
         let storeURL = makeStoreURL()
         try Data("not valid json".utf8).write(to: storeURL)
 
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let oldest = await store.oldestUnprocessed()
         #expect(oldest == nil)
 
@@ -293,7 +293,7 @@ struct JSONMemoStoreTests {
     @Test("Init with missing file starts empty")
     func initWithMissingFileStartsEmpty() async {
         let storeURL = makeStoreURL()
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: MockWatcherLogger())
         let oldest = await store.oldestUnprocessed()
         #expect(oldest == nil)
     }
@@ -304,7 +304,7 @@ struct JSONMemoStoreTests {
     func insertThrowsWriteFailedForUnwritablePath() async throws {
         // Use a path inside a non-existent directory to force a write failure
         let badURL = URL(fileURLWithPath: "/nonexistent-dir/\(UUID().uuidString)/store.json")
-        let store = JSONMemoStore(fileURL: badURL)
+        let store = JSONMemoStore(fileURL: badURL, logger: MockWatcherLogger())
         let record = makeRecord(path: "/memos/d.m4a")
 
         await #expect(throws: MemoStoreError.self) {
@@ -320,7 +320,7 @@ struct JSONMemoStoreTests {
     func markProcessedRollsBackOnWriteFailure() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let writableURL = tempDir.appending(path: "\(UUID().uuidString).json")
-        let writableStore = JSONMemoStore(fileURL: writableURL)
+        let writableStore = JSONMemoStore(fileURL: writableURL, logger: MockWatcherLogger())
         let record = makeRecord(path: "/memos/rollback.m4a")
         try await writableStore.insert(record)
 
@@ -339,7 +339,7 @@ struct JSONMemoStoreTests {
             try? FileManager.default.removeItem(at: writableURL)
         }
 
-        let store = JSONMemoStore(fileURL: storeFile)
+        let store = JSONMemoStore(fileURL: storeFile, logger: MockWatcherLogger())
         let processedDate = Date(timeIntervalSince1970: 2_000_000_000)
 
         await #expect(throws: MemoStoreError.self) {

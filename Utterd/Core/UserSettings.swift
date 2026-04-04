@@ -11,6 +11,11 @@ final class UserSettings {
         static let defaultFolderID = "defaultFolderID"
         static let summarizationEnabled = "summarizationEnabled"
         static let titleGenerationEnabled = "titleGenerationEnabled"
+        static let migrationVersion = "migrationVersion"
+        // Legacy keys removed during migration v1
+        static let useCustomPrompt = "useCustomPrompt"
+        static let customPrompt = "customPrompt"
+        static let llmEnabled = "llmEnabled"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -67,11 +72,11 @@ final class UserSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        if defaults.integer(forKey: "migrationVersion") < Self.currentMigrationVersion {
-            defaults.removeObject(forKey: "useCustomPrompt")
-            defaults.removeObject(forKey: "customPrompt")
-            defaults.removeObject(forKey: "llmEnabled")
-            defaults.set(Self.currentMigrationVersion, forKey: "migrationVersion")
+        if defaults.integer(forKey: Keys.migrationVersion) < Self.currentMigrationVersion {
+            defaults.removeObject(forKey: Keys.useCustomPrompt)
+            defaults.removeObject(forKey: Keys.customPrompt)
+            defaults.removeObject(forKey: Keys.llmEnabled)
+            defaults.set(Self.currentMigrationVersion, forKey: Keys.migrationVersion)
         }
     }
 

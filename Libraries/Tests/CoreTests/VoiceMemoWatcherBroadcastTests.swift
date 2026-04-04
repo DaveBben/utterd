@@ -142,6 +142,39 @@ struct VoiceMemoWatcherBroadcastTests {
         #expect(received3.count == 2)
     }
 
+    // AC-T6-5: 20 files emitted at once — all 20 events reach the consumer.
+    @Test("All events received when more than 16 files are emitted at once")
+    func allEventsReceivedWhenBatchExceedsSixteen() async {
+        let monitor = MockDirectoryMonitor()
+        let fileSystem = MockFileSystemChecker()
+
+        let fileURLs: [URL] = (1...20).map { i in
+            URL(fileURLWithPath: "/tmp/memos/memo\(i).m4a")
+        }
+        for url in fileURLs {
+            fileSystem.fileSizes[url] = 2048
+        }
+
+        let watcher = makeWatcher(monitor: monitor, fileSystem: fileSystem)
+        let stream = watcher.events()
+        await watcher.start()
+
+        var received: [VoiceMemoEvent] = []
+        let consumerTask = Task { @MainActor in
+            for await event in stream { received.append(event) }
+        }
+
+        // Emit all 20 as one batch — one slot in the monitor's buffer,
+        // 20 individual yield calls on the consumer continuation.
+        monitor.emit(Set(fileURLs))
+        try? await Task.sleep(for: .milliseconds(100))
+        watcher.stop()
+
+        await consumerTask.value
+
+        #expect(received.count == 20)
+    }
+
     // AC-T6-4: Late consumer joins after 2 events — receives only the 3rd.
     @Test("Late consumer does not receive historical events")
     func lateConsumerDoesNotReceiveHistory() async {

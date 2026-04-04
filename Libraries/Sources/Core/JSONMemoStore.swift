@@ -1,25 +1,27 @@
 import Foundation
-import OSLog
 
 /// An actor-based `MemoStore` that persists records as a JSON array on disk.
 /// Thread safety is provided by Swift's actor isolation.
 public actor JSONMemoStore: MemoStore {
 
-    private static let logger = Logger(subsystem: "com.bennett.Utterd", category: "MemoStore")
-
+    nonisolated let logger: any WatcherLogger
     private let fileURL: URL
     private var records: [MemoRecord]
 
-    public init(fileURL: URL) {
+    public init(fileURL: URL, logger: any WatcherLogger) {
+        self.logger = logger
         self.fileURL = fileURL
         if let data = try? Data(contentsOf: fileURL) {
             do {
                 self.records = try JSONDecoder().decode([MemoRecord].self, from: data)
             } catch {
-                Self.logger.warning("Corrupt memo store at \(fileURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public). Backing up and starting fresh.")
+                logger.warning("Corrupt memo store at \(fileURL.lastPathComponent): \(error.localizedDescription). Backing up and starting fresh.")
                 let backupURL = fileURL.appendingPathExtension("corrupt-backup")
                 try? FileManager.default.removeItem(at: backupURL)
                 try? FileManager.default.copyItem(at: fileURL, to: backupURL)
+                if !FileManager.default.fileExists(atPath: backupURL.path) {
+                    logger.warning("Failed to create backup of corrupt store")
+                }
                 self.records = []
             }
         } else {

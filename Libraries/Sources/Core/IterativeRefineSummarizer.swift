@@ -12,13 +12,14 @@ public struct IterativeRefineSummarizer: TranscriptSummarizer {
     }
 
     public func summarize(transcript: String, contextBudget: LLMContextBudget) async throws -> String {
-        let words = transcript.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        let words = transcript.split(whereSeparator: \.isWhitespace).map(String.init)
         let chunkSize = contextBudget.availableForNewChunk
         let chunks = stride(from: 0, to: words.count, by: chunkSize).map { start in
             words[start..<min(start + chunkSize, words.count)].joined(separator: " ")
         }
 
-        // Reserve words for the prompt template text ("Update this summary…\n")
+        // Reserve words for the prompt template text ("Update this summary with the new content:\n…\n").
+        // 8 is the approximate word count of that wrapper string.
         let promptOverhead = 8
         let summaryBudget = max(1, contextBudget.availableForContent - chunkSize - promptOverhead)
         var rollingSummary = ""
@@ -28,7 +29,7 @@ public struct IterativeRefineSummarizer: TranscriptSummarizer {
                 userPrompt = "Summarize this transcript segment:\n\(chunk)"
             } else {
                 let truncatedSummary = rollingSummary
-                    .split(separator: " ")
+                    .split(whereSeparator: \.isWhitespace)
                     .prefix(summaryBudget)
                     .joined(separator: " ")
                 userPrompt = "Update this summary with the new content:\n\(truncatedSummary)\n\(chunk)"
