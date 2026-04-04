@@ -13,6 +13,9 @@ extension String {
         replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\t", with: " ")
+            .replacingOccurrences(of: "\u{2028}", with: "\n")
+            .replacingOccurrences(of: "\u{2029}", with: "\n")
     }
 }
 
@@ -33,18 +36,30 @@ struct AppleScriptNotesService: NotesService {
         self.executor = executor
     }
 
+    /// Executes an AppleScript, mapping executor errors to `NotesServiceError`.
+    private func executeScript(_ script: String) async throws -> String {
+        do {
+            return try await executor.execute(script: script)
+        } catch NotesServiceError.automationPermissionDenied {
+            throw NotesServiceError.automationPermissionDenied
+        } catch {
+            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+        }
+    }
+
     func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder] {
         let script: String
         if let parent {
             script = """
                 tell application "Notes"
                     set output to ""
+                    set delim to (ASCII character 30)
                     set targetFolder to folder id "\(parent.id.appleScriptEscaped)"
                     repeat with f in folders of targetFolder
                         set fid to id of f
                         set fname to name of f
                         set cid to id of container of f
-                        set output to output & fid & tab & fname & tab & cid & linefeed
+                        set output to output & fid & delim & fname & delim & cid & linefeed
                     end repeat
                     return output
                 end tell
@@ -53,35 +68,29 @@ struct AppleScriptNotesService: NotesService {
             script = """
                 tell application "Notes"
                     set output to ""
+                    set delim to (ASCII character 30)
                     repeat with f in folders of default account
                         set fid to id of f
                         set fname to name of f
-                        set output to output & fid & tab & fname & tab & linefeed
+                        set output to output & fid & delim & fname & delim & linefeed
                     end repeat
                     return output
                 end tell
                 """
         }
 
-        let raw: String
-        do {
-            raw = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
-
+        let raw = try await executeScript(script)
         return parseFolderLines(raw)
     }
 
-    // Parses tab-delimited folder output: each line is "id\tname\tcontainerID\n".
+    // Parses RS-delimited folder output: each line is "id\u{001E}name\u{001E}containerID\n".
+    // ASCII 30 (Record Separator) is used so folder names containing tabs parse correctly.
     // containerID field may be empty (top-level folders).
     private func parseFolderLines(_ raw: String) -> [NotesFolder] {
         raw.components(separatedBy: "\n")
             .filter { !$0.isEmpty }
             .compactMap { line -> NotesFolder? in
-                let fields = line.components(separatedBy: "\t")
+                let fields = line.components(separatedBy: "\u{001E}")
                 guard fields.count >= 3 else { return nil }
                 let id = fields[0]
                 let name = fields[1]
@@ -104,13 +113,7 @@ struct AppleScriptNotesService: NotesService {
                         make new note at targetFolder with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
                     end tell
                     """
-                do {
-                    _ = try await executor.execute(script: script)
-                } catch NotesServiceError.automationPermissionDenied {
-                    throw NotesServiceError.automationPermissionDenied
-                } catch {
-                    throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-                }
+                _ = try await executeScript(script)
                 return .created
             } else {
                 try await createNoteInDefaultAccount(escapedTitle: escapedTitle, escapedBody: escapedBody)
@@ -133,30 +136,21 @@ struct AppleScriptNotesService: NotesService {
                 end try
             end tell
             """
-        let result: String
-        do {
-            result = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
+        let result = try await executeScript(script)
         return result.trimmingCharacters(in: .whitespacesAndNewlines) == "found"
     }
 
     private func createNoteInDefaultAccount(escapedTitle: String, escapedBody: String) async throws {
+        // Target the folder named "Notes" in the default account. Every Apple Notes
+        // account has this folder, but it isn't necessarily the first one — folder
+        // ordering is alphabetical by display name.
         let script = """
             tell application "Notes"
-                make new note at default account with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
+                set targetFolder to folder "Notes" of default account
+                make new note at targetFolder with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
             end tell
             """
-        do {
-            _ = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
+        _ = try await executeScript(script)
     }
 
     func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool {
@@ -179,14 +173,7 @@ struct AppleScriptNotesService: NotesService {
                 end tell
                 """
         }
-        let result: String
-        do {
-            result = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
+        let result = try await executeScript(script)
         return result.trimmingCharacters(in: .whitespacesAndNewlines) == "true"
     }
 }

@@ -13,6 +13,9 @@ final class MockTranscriptionService: TranscriptionService, @unchecked Sendable 
         if let error {
             throw error
         }
-        return result!
+        guard let result else {
+            fatalError("MockTranscriptionService.result not configured for test")
+        }
+        return result
     }
 }

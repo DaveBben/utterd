@@ -22,6 +22,12 @@ struct NSAppleScriptExecutor: ScriptExecutor {
                 throw NotesServiceError.scriptExecutionFailed(description)
             }
 
+            // AppleScript boolean `true`/`false` return a typed boolean descriptor, not a
+            // string descriptor, so stringValue is nil. Map them to "true"/"false" explicitly.
+            // typeTrue = 'true' (0x74727565), typeFalse = 'fals' (0x66616C73)
+            let descType = descriptor.descriptorType
+            if descType == 0x74727565 { return "true" }
+            if descType == 0x66616C73 { return "false" }
             return descriptor.stringValue ?? ""
         }
     }

@@ -76,14 +76,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let logger = OSLogWatcherLogger()
-        let fileSystem = RealFileSystemChecker()
         let directoryURL = voiceMemoDirectoryURL
 
         guard let storeURL = storeFileURL(logger: logger) else {
             logger.error("Pipeline not started — cannot create data directory")
             return
         }
-        let store = JSONMemoStore(fileURL: storeURL)
+        let store = JSONMemoStore(fileURL: storeURL, logger: logger)
 
         Task { [weak self] in
             let record = await store.mostRecentlyProcessed()
@@ -159,7 +158,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func storeFileURL(logger: OSLogWatcherLogger) -> URL? {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            logger.error("Application Support directory not found")
+            return nil
+        }
         let dir = appSupport.appendingPathComponent("Utterd", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

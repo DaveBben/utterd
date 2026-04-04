@@ -8,8 +8,14 @@ final class UserSettings {
 
     enum Keys {
         static let defaultFolderName = "defaultFolderName"
+        static let defaultFolderID = "defaultFolderID"
         static let summarizationEnabled = "summarizationEnabled"
         static let titleGenerationEnabled = "titleGenerationEnabled"
+        static let migrationVersion = "migrationVersion"
+        // Legacy keys removed during migration v1
+        static let useCustomPrompt = "useCustomPrompt"
+        static let customPrompt = "customPrompt"
+        static let llmEnabled = "llmEnabled"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -22,6 +28,18 @@ final class UserSettings {
         set {
             withMutation(keyPath: \.defaultFolderName) {
                 defaults.set(newValue, forKey: Keys.defaultFolderName)
+            }
+        }
+    }
+
+    var defaultFolderID: String? {
+        get {
+            access(keyPath: \.defaultFolderID)
+            return defaults.string(forKey: Keys.defaultFolderID)
+        }
+        set {
+            withMutation(keyPath: \.defaultFolderID) {
+                defaults.set(newValue, forKey: Keys.defaultFolderID)
             }
         }
     }
@@ -50,11 +68,16 @@ final class UserSettings {
         }
     }
 
+    private static let currentMigrationVersion = 1
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        defaults.removeObject(forKey: "useCustomPrompt")
-        defaults.removeObject(forKey: "customPrompt")
-        defaults.removeObject(forKey: "llmEnabled")
+        if defaults.integer(forKey: Keys.migrationVersion) < Self.currentMigrationVersion {
+            defaults.removeObject(forKey: Keys.useCustomPrompt)
+            defaults.removeObject(forKey: Keys.customPrompt)
+            defaults.removeObject(forKey: Keys.llmEnabled)
+            defaults.set(Self.currentMigrationVersion, forKey: Keys.migrationVersion)
+        }
     }
 
     func toRoutingConfiguration() -> RoutingConfiguration {
@@ -65,7 +88,8 @@ final class UserSettings {
         RoutingConfiguration(
             summarizationEnabled: defaults.bool(forKey: Keys.summarizationEnabled),
             titleGenerationEnabled: defaults.bool(forKey: Keys.titleGenerationEnabled),
-            defaultFolderName: defaults.string(forKey: Keys.defaultFolderName)
+            defaultFolderName: defaults.string(forKey: Keys.defaultFolderName),
+            defaultFolderID: defaults.string(forKey: Keys.defaultFolderID)
         )
     }
 }

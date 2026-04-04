@@ -4,14 +4,26 @@ import Foundation
 /// Thread safety is provided by Swift's actor isolation.
 public actor JSONMemoStore: MemoStore {
 
+    nonisolated let logger: any WatcherLogger
     private let fileURL: URL
     private var records: [MemoRecord]
 
-    public init(fileURL: URL) {
+    public init(fileURL: URL, logger: any WatcherLogger) {
+        self.logger = logger
         self.fileURL = fileURL
-        if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode([MemoRecord].self, from: data) {
-            self.records = decoded
+        if let data = try? Data(contentsOf: fileURL) {
+            do {
+                self.records = try JSONDecoder().decode([MemoRecord].self, from: data)
+            } catch {
+                logger.warning("Corrupt memo store at \(fileURL.lastPathComponent): \(error.localizedDescription). Backing up and starting fresh.")
+                let backupURL = fileURL.appendingPathExtension("corrupt-backup")
+                try? FileManager.default.removeItem(at: backupURL)
+                try? FileManager.default.copyItem(at: fileURL, to: backupURL)
+                if !FileManager.default.fileExists(atPath: backupURL.path) {
+                    logger.warning("Failed to create backup of corrupt store")
+                }
+                self.records = []
+            }
         } else {
             self.records = []
         }
@@ -45,7 +57,7 @@ public actor JSONMemoStore: MemoStore {
     public func mostRecentlyProcessed() -> MemoRecord? {
         records
             .filter { $0.dateProcessed != nil }
-            .max(by: { $0.dateProcessed! < $1.dateProcessed! })
+            .max(by: { ($0.dateProcessed ?? .distantPast) < ($1.dateProcessed ?? .distantPast) })
     }
 
     public func markProcessed(fileURL url: URL, date: Date) throws {

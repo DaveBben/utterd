@@ -36,16 +36,30 @@ public final class TranscriptionPipelineStage: Sendable {
         }
 
         do {
+            try Task.checkCancellation()
             let serviceResult = try await transcriptionService.transcribe(fileURL: tempURL)
-            try? FileManager.default.removeItem(at: tempURL)
+            cleanUpTempFile(at: tempURL)
+            try Task.checkCancellation()
             let result = TranscriptionResult(transcript: serviceResult.transcript, fileURL: record.fileURL)
             logger.info("Transcription complete for \(record.fileURL.lastPathComponent): \(result.transcript.count) characters")
             return result
+        } catch is CancellationError {
+            logger.info("TranscriptionPipelineStage: cancelled for \(record.fileURL.lastPathComponent)")
+            cleanUpTempFile(at: tempURL)
+            return nil
         } catch {
             logger.error("TranscriptionPipelineStage: transcription failed for \(record.fileURL.lastPathComponent): \(error)")
-            try? FileManager.default.removeItem(at: tempURL)
+            cleanUpTempFile(at: tempURL)
             try? await store.markProcessed(fileURL: record.fileURL, date: Date())
             return nil
+        }
+    }
+
+    private func cleanUpTempFile(at url: URL) {
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            logger.warning("Failed to clean up temp file \(url.lastPathComponent): \(error)")
         }
     }
 }

@@ -51,18 +51,22 @@ public final class PipelineController {
         let scheduler = PipelineScheduler(
             store: store,
             clock: clock,
-            pollingInterval: .seconds(30),
             logger: logger,
-            handler: { [logger] record in
+            handler: { [store, logger] record in
                 guard let result = await stage.process(record) else {
                     return false
                 }
                 if let routingStage {
+                    // Routing stage marks processed and releases lock via onComplete
                     await routingStage.route(result)
+                    return true
                 } else {
-                    logger.info("Transcript emitted for \(result.fileURL.path), awaiting stage 2")
+                    // No routing stage — mark processed directly and return false
+                    // to release the lock immediately
+                    try? await store.markProcessed(fileURL: result.fileURL, date: Date())
+                    logger.info("Transcript saved for \(result.fileURL.lastPathComponent) (no routing stage)")
+                    return false
                 }
-                return true
             }
         )
         self.scheduler = scheduler

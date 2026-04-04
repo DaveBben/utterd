@@ -4,6 +4,5 @@ import Foundation
 func dateFallbackTitle(for date: Date) -> String {
     let formatter = DateFormatter()
     formatter.dateFormat = "'Voice Memo' yyyy-MM-dd HH:mm"
-    formatter.timeZone = .gmt
     return formatter.string(from: date)
 }

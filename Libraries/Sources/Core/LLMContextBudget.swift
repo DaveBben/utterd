@@ -24,8 +24,12 @@ public struct LLMContextBudget: Sendable, Equatable {
     }
 
     public init(totalWords: Int, systemPromptOverhead: Int, summaryReserveRatio: Double = 0.3) {
-        precondition(totalWords > systemPromptOverhead, "totalWords must exceed systemPromptOverhead")
-        precondition(summaryReserveRatio >= 0 && summaryReserveRatio < 1, "summaryReserveRatio must be in [0, 1)")
+        guard totalWords > systemPromptOverhead else {
+            fatalError("LLMContextBudget: totalWords (\(totalWords)) must exceed systemPromptOverhead (\(systemPromptOverhead))")
+        }
+        guard summaryReserveRatio >= 0, summaryReserveRatio < 1 else {
+            fatalError("LLMContextBudget: summaryReserveRatio (\(summaryReserveRatio)) must be in [0, 1)")
+        }
         self.totalWords = totalWords
         self.systemPromptOverhead = systemPromptOverhead
         self.summaryReserveRatio = summaryReserveRatio

@@ -5,7 +5,6 @@ import Observation
 @MainActor
 final class SettingsRoutingModel {
     var folders: [NotesFolder] = []
-    var isLoading = false
     var fetchError: (any Error)?
 
     private let notesService: any NotesService
@@ -17,21 +16,32 @@ final class SettingsRoutingModel {
     }
 
     func loadFolders() async {
-        isLoading = true
         fetchError = nil
         do {
-            folders = try await notesService.listFolders(in: nil)
+            let loaded = try await notesService.listFolders(in: nil)
+            // Validate and backfill the ID *before* publishing the folder list,
+            // so the picker sees consistent tags and selection in a single render pass.
+            validateSelection(against: loaded)
+            folders = loaded
         } catch {
             folders = []
             fetchError = error
         }
-        isLoading = false
-        validateSelection()
     }
 
-    private func validateSelection() {
-        guard let selected = settings.defaultFolderName else { return }
-        if !folders.map(\.name).contains(selected) {
+    private func validateSelection(against folders: [NotesFolder]) {
+        guard settings.defaultFolderName != nil else { return }
+        guard !folders.isEmpty else { return }
+        if let id = settings.defaultFolderID {
+            if let match = folders.first(where: { $0.id == id }) {
+                settings.defaultFolderName = match.name
+            } else {
+                settings.defaultFolderName = nil
+                settings.defaultFolderID = nil
+            }
+        } else if let match = folders.first(where: { $0.name == settings.defaultFolderName }) {
+            settings.defaultFolderID = match.id
+        } else {
             settings.defaultFolderName = nil
         }
     }

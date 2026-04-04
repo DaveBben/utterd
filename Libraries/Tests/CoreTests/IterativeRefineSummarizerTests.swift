@@ -165,6 +165,30 @@ struct IterativeRefineSummarizerTests {
         }
     }
 
+    // MARK: - Verbose LLM output stays within budget
+
+    @Test
+    func verboseLLMOutputIsTruncatedToStayWithinBudget() async throws {
+        // total=1000, overhead=200, reserve=0.3 -> content=800 -> chunk=560
+        // summaryBudget = 800 - 560 = 240 words max for rolling summary
+        let budget = LLMContextBudget(totalWords: 1000, systemPromptOverhead: 200, summaryReserveRatio: 0.3)
+        let transcript = makeWords(1200) // 3 chunks
+
+        // LLM returns a verbose 500-word summary each time — exceeds the 240-word budget
+        let verboseSummary = (1...500).map { "summary\($0)" }.joined(separator: " ")
+        let llm = SequenceMockLLMService(responses: [verboseSummary, verboseSummary, verboseSummary])
+
+        let summarizer = IterativeRefineSummarizer(llmService: llm)
+        _ = try await summarizer.summarize(transcript: transcript, contextBudget: budget)
+
+        let availableForContent = budget.availableForContent
+        // All prompts must stay within the content budget
+        for call in llm.calls {
+            let wordCount = call.userPrompt.split(separator: " ").count
+            #expect(wordCount <= availableForContent, "User prompt had \(wordCount) words, limit is \(availableForContent)")
+        }
+    }
+
     // MARK: - Error propagation
 
     @Test

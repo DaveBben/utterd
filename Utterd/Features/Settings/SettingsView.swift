@@ -21,21 +21,49 @@ struct SettingsView: View {
 
         Form {
             Section("Routing") {
-                Picker("Default Folder", selection: $settings.defaultFolderName) {
-                    Text("System Default").tag(String?.none)
+                Picker("Default Folder", selection: Binding(
+                    get: {
+                        if model?.folders.isEmpty == false {
+                            // Folders loaded — use ID to match ForEach tags
+                            return settings.defaultFolderID
+                        }
+                        // Still loading — return name to match placeholder tag
+                        return settings.defaultFolderName
+                    },
+                    set: { newValue in
+                        if let newValue, let folder = model?.folders.first(where: { $0.id == newValue }) {
+                            settings.defaultFolderID = folder.id
+                            settings.defaultFolderName = folder.name
+                        } else {
+                            settings.defaultFolderID = nil
+                            settings.defaultFolderName = nil
+                        }
+                    }
+                )) {
+                    Text("Notes (default)").tag(String?.none)
                     if let folders = model?.folders, !folders.isEmpty {
                         ForEach(folders, id: \.id) { folder in
-                            Text(folder.name).tag(Optional(folder.name))
+                            Text(folder.name).tag(Optional(folder.id))
                         }
                     } else if let name = settings.defaultFolderName {
+                        // Folders not yet loaded — show stored name as placeholder
                         Text(name).tag(Optional(name))
                     }
                 }
 
                 if let error = model?.fetchError {
-                    Text(error.localizedDescription)
-                        .foregroundStyle(.red)
+                    HStack {
+                        Text(error.localizedDescription)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                        Spacer()
+                        Button("Retry") {
+                            if let model {
+                                Task { await model.loadFolders() }
+                            }
+                        }
                         .font(.caption)
+                    }
                 }
             }
 

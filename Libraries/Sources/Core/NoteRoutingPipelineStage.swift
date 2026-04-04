@@ -13,6 +13,9 @@ public final class NoteRoutingPipelineStage: Sendable {
     private let contextBudget: LLMContextBudget
     private let onComplete: @Sendable () async -> Void
 
+    private static let maxTitleInputWords = 2000
+    private static let maxTitleLength = 100
+
     public init(
         notesService: any NotesService,
         llmService: any LLMService,
@@ -40,6 +43,10 @@ public final class NoteRoutingPipelineStage: Sendable {
 
         do {
             try await routeCore(transcript: transcript, now: now)
+        } catch is CancellationError {
+            logger.info("NoteRoutingPipelineStage: cancelled for \(fileURL.lastPathComponent)")
+            await onComplete()
+            return
         } catch {
             logger.error("Note routing failed: \(error)")
         }
@@ -55,15 +62,21 @@ public final class NoteRoutingPipelineStage: Sendable {
     // MARK: - Private
 
     private func routeCore(transcript: String, now: Date) async throws {
+        if transcript.isEmpty {
+            logger.warning("Empty transcript — skipping note creation")
+            return
+        }
+
         let config = configProvider()
         logger.info("Routing started — summarization: \(config.summarizationEnabled), title generation: \(config.titleGenerationEnabled), default folder: \(config.defaultFolderName ?? "(system default)")")
-        let folder = await resolveDefaultFolder(config.defaultFolderName)
+        let folder = await resolveDefaultFolder(id: config.defaultFolderID, name: config.defaultFolderName)
         var body = transcript
         var title = dateFallbackTitle(for: now)
 
-        if config.summarizationEnabled && !transcript.isEmpty {
+        if config.summarizationEnabled {
             logger.info("LLM summarization started")
             do {
+                try Task.checkCancellation()
                 let summary = try await summarizer.summarize(
                     transcript: transcript,
                     contextBudget: contextBudget
@@ -72,29 +85,27 @@ public final class NoteRoutingPipelineStage: Sendable {
                     body = summary
                 }
                 logger.info("LLM summarization completed (\(body.count) chars)")
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 logger.error("Summarization failed, using full transcript: \(error)")
             }
         }
 
-        if config.titleGenerationEnabled && !transcript.isEmpty {
+        if config.titleGenerationEnabled {
             do {
-                let truncatedInput = transcript.split(separator: " ").prefix(2000).joined(separator: " ")
-                let systemPrompt = "Generate a short descriptive title for this voice memo transcript. Return only the title, nothing else."
-                let response = try await llmService.generate(
-                    systemPrompt: systemPrompt,
-                    userPrompt: truncatedInput
-                )
-                let firstLine = response.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? ""
-                let sanitized = String(firstLine.filter { !$0.isNewline && $0 != "\0" && $0 != "\t" }.prefix(100))
-                if !sanitized.isEmpty {
-                    title = sanitized
+                try Task.checkCancellation()
+                if let generated = try await generateTitle(from: transcript) {
+                    title = generated
                 }
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 logger.error("Title generation failed, using date-based title: \(error)")
             }
         }
 
+        try Task.checkCancellation()
         logger.info("Creating note '\(title)' in \(folder?.name ?? "system default folder") (\(body.count) char body)")
         let creationResult = try await notesService.createNote(
             title: title,
@@ -107,11 +118,30 @@ public final class NoteRoutingPipelineStage: Sendable {
         logger.info("Note created successfully")
     }
 
-    private func resolveDefaultFolder(_ name: String?) async -> NotesFolder? {
-        guard let name, !name.isEmpty else { return nil }
+    private func generateTitle(from transcript: String) async throws -> String? {
+        let truncatedInput = transcript.split(whereSeparator: \.isWhitespace).prefix(Self.maxTitleInputWords).joined(separator: " ")
+        let systemPrompt = "Generate a short descriptive title for this voice memo transcript. Return only the title, nothing else."
+        let response = try await llmService.generate(
+            systemPrompt: systemPrompt,
+            userPrompt: truncatedInput
+        )
+        let firstLine = response.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? ""
+        let sanitized = String(firstLine.filter { !$0.isNewline && $0 != "\0" && $0 != "\t" }.prefix(Self.maxTitleLength))
+        return sanitized.isEmpty ? nil : sanitized
+    }
+
+    private func resolveDefaultFolder(id: String?, name: String?) async -> NotesFolder? {
+        guard id != nil || (name.map { !$0.isEmpty } ?? false) else { return nil }
         do {
             let folders = try await notesService.listFolders(in: nil)
-            return folders.first { $0.name == name }
+            // Prefer ID-based lookup (exact match), fall back to name for migration
+            if let id, let match = folders.first(where: { $0.id == id }) {
+                return match
+            }
+            if let name, let match = folders.first(where: { $0.name == name }) {
+                return match
+            }
+            return nil
         } catch {
             logger.warning("Default folder resolution failed, using system default: \(error)")
             return nil
