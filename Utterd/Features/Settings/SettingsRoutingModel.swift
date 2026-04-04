@@ -31,7 +31,13 @@ final class SettingsRoutingModel {
 
     private func validateSelection() {
         guard let selected = settings.defaultFolderName else { return }
-        if !folders.map(\.name).contains(selected) {
+        // Prefer ID-based validation if available, fall back to name
+        if let id = settings.defaultFolderID {
+            if !folders.contains(where: { $0.id == id }) {
+                settings.defaultFolderName = nil
+                settings.defaultFolderID = nil
+            }
+        } else if !folders.map(\.name).contains(selected) {
             settings.defaultFolderName = nil
         }
     }

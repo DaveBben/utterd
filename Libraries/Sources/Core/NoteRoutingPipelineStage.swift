@@ -55,9 +55,14 @@ public final class NoteRoutingPipelineStage: Sendable {
     // MARK: - Private
 
     private func routeCore(transcript: String, now: Date) async throws {
+        if transcript.isEmpty {
+            logger.warning("Empty transcript — skipping note creation")
+            return
+        }
+
         let config = configProvider()
         logger.info("Routing started — summarization: \(config.summarizationEnabled), title generation: \(config.titleGenerationEnabled), default folder: \(config.defaultFolderName ?? "(system default)")")
-        let folder = await resolveDefaultFolder(config.defaultFolderName)
+        let folder = await resolveDefaultFolder(id: config.defaultFolderID, name: config.defaultFolderName)
         var body = transcript
         var title = dateFallbackTitle(for: now)
 
@@ -107,11 +112,18 @@ public final class NoteRoutingPipelineStage: Sendable {
         logger.info("Note created successfully")
     }
 
-    private func resolveDefaultFolder(_ name: String?) async -> NotesFolder? {
-        guard let name, !name.isEmpty else { return nil }
+    private func resolveDefaultFolder(id: String?, name: String?) async -> NotesFolder? {
+        guard id != nil || (name != nil && !name!.isEmpty) else { return nil }
         do {
             let folders = try await notesService.listFolders(in: nil)
-            return folders.first { $0.name == name }
+            // Prefer ID-based lookup (exact match), fall back to name for migration
+            if let id, let match = folders.first(where: { $0.id == id }) {
+                return match
+            }
+            if let name, let match = folders.first(where: { $0.name == name }) {
+                return match
+            }
+            return nil
         } catch {
             logger.warning("Default folder resolution failed, using system default: \(error)")
             return nil

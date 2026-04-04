@@ -97,34 +97,43 @@ struct NoteRoutingPipelineStageTests {
         _ = fixedDate // suppress unused warning
     }
 
-    // MARK: - Test 2: Both toggles off + empty transcript
+    // MARK: - Test 2: Both toggles off + empty transcript → no note created
 
     @Test
-    func bothTogglesOffEmptyTranscriptSkipsLLMAndSummarizer() async throws {
+    func bothTogglesOffEmptyTranscriptSkipsNoteCreation() async throws {
         let notes = MockNotesService()
         notes.createNoteResult = .created
 
         let llm = MockLLMService()
         let summarizer = MockTranscriptSummarizer()
         let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let completeCounter = ActorBox(0)
+        let fileURL = makeURL()
         let stage = makeStage(
             notesService: notes,
             llmService: llm,
             summarizer: summarizer,
             store: store,
+            logger: logger,
             config: RoutingConfiguration(),
-            contextBudget: smallBudget()
+            contextBudget: smallBudget(),
+            completeCounter: completeCounter
         )
 
-        let result = TranscriptionResult(transcript: "", fileURL: makeURL())
+        let result = TranscriptionResult(transcript: "", fileURL: fileURL)
         await stage.route(result)
 
+        // No note created for empty transcript
         #expect(llm.calls.isEmpty)
         #expect(summarizer.calls.isEmpty)
-        #expect(notes.createNoteCalls.count == 1)
-        #expect(notes.createNoteCalls[0].body == "")
-        let title = notes.createNoteCalls[0].title
-        #expect(title.hasPrefix("Voice Memo "))
+        #expect(notes.createNoteCalls.isEmpty)
+        // But markProcessed and onComplete still fire
+        let markCalls = await store.markProcessedCalls
+        #expect(markCalls.count == 1)
+        #expect(markCalls[0].fileURL == fileURL)
+        #expect(await completeCounter.get() == 1)
+        #expect(logger.warnings.contains { $0.contains("Empty transcript") })
     }
 
     // MARK: - Test 3: defaultFolderName matches a root folder → note created in that folder
@@ -317,10 +326,10 @@ struct NoteRoutingPipelineStageTests {
         #expect(notes.createNoteCalls[0].body == "condensed")
     }
 
-    // MARK: - Test 10: Summarization skipped on empty transcript
+    // MARK: - Test 10: Empty transcript with summarization enabled → no note created
 
     @Test
-    func summarizationOnEmptyTranscript() async throws {
+    func summarizationOnEmptyTranscriptSkipsNoteCreation() async throws {
         let notes = MockNotesService()
         notes.createNoteResult = .created
 
@@ -339,7 +348,7 @@ struct NoteRoutingPipelineStageTests {
         await stage.route(result)
 
         #expect(summarizer.calls.isEmpty)
-        #expect(notes.createNoteCalls[0].body == "")
+        #expect(notes.createNoteCalls.isEmpty)
     }
 
     // MARK: - Test 11: Summarizer throws → fallback to full transcript, error logged
@@ -482,10 +491,10 @@ struct NoteRoutingPipelineStageTests {
         #expect(notes.createNoteCalls[0].title == "Meeting Notes")
     }
 
-    // MARK: - Test 16: Title generation skipped on empty transcript
+    // MARK: - Test 16: Empty transcript with title generation enabled → no note created
 
     @Test
-    func titleGenOnEmptyTranscript() async throws {
+    func titleGenOnEmptyTranscriptSkipsNoteCreation() async throws {
         let notes = MockNotesService()
         notes.createNoteResult = .created
 
@@ -504,7 +513,7 @@ struct NoteRoutingPipelineStageTests {
         await stage.route(result)
 
         #expect(llm.calls.isEmpty)
-        #expect(notes.createNoteCalls[0].title.hasPrefix("Voice Memo "))
+        #expect(notes.createNoteCalls.isEmpty)
     }
 
     // MARK: - Test 17: Title generation falls back to date title when LLM throws
@@ -679,7 +688,80 @@ struct NoteRoutingPipelineStageTests {
         #expect(notes.createNoteCalls[0].title == "Line1")
     }
 
-    // MARK: - Test 23: Both summarization and title generation both throw
+    // MARK: - Test 23: Folder resolved by ID when both ID and name provided
+
+    @Test
+    func folderResolvedByIDOverName() async throws {
+        let folderA = NotesFolder(id: "id-A", name: "Shared Name")
+        let folderB = NotesFolder(id: "id-B", name: "Shared Name")
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [folderA, folderB]]
+        notes.createNoteResult = .created
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            store: store,
+            config: RoutingConfiguration(defaultFolderName: "Shared Name", defaultFolderID: "id-B"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "test", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder?.id == "id-B")
+    }
+
+    // MARK: - Test 24: Folder falls back to name when ID not found
+
+    @Test
+    func folderFallsBackToNameWhenIDNotFound() async throws {
+        let folder = NotesFolder(id: "id-A", name: "Work")
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [folder]]
+        notes.createNoteResult = .created
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            store: store,
+            config: RoutingConfiguration(defaultFolderName: "Work", defaultFolderID: "stale-id"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "test", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder?.id == "id-A")
+    }
+
+    // MARK: - Test 25: Name-only resolution for migration (no ID stored)
+
+    @Test
+    func nameOnlyResolutionForMigration() async throws {
+        let folder = NotesFolder(id: "id-A", name: "Work")
+        let notes = MockNotesService()
+        notes.listFoldersByParent = [nil: [folder]]
+        notes.createNoteResult = .created
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            store: store,
+            config: RoutingConfiguration(defaultFolderName: "Work"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "test", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(notes.createNoteCalls.count == 1)
+        #expect(notes.createNoteCalls[0].folder?.id == "id-A")
+    }
+
+    // MARK: - Test 26: Both summarization and title generation both throw
 
     @Test
     func bothOnBothThrow() async throws {

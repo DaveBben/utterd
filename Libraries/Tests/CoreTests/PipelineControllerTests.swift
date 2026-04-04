@@ -98,9 +98,9 @@ struct PipelineControllerTests {
         #expect(service.transcribeCalls.count >= 2)
     }
 
-    // MARK: - On transcription success, lock stays held (skipping log appears)
+    // MARK: - On transcription success, handler returns true
 
-    @Test func transcriptionSuccessKeepsLockHeld() async throws {
+    @Test func transcriptionSuccessReturnsTrue() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
@@ -127,10 +127,10 @@ struct PipelineControllerTests {
         try await Task.sleep(for: .milliseconds(100))
         controller.stop()
 
-        // Success returns true → lock stays held → subsequent cycles log "Lock held, skipping"
-        #expect(logger.infos.contains("Lock held, skipping"))
-        // Transcription should only be called once (lock prevents re-entry)
-        #expect(service.transcribeCalls.count == 1)
+        // Transcription was called at least once and succeeded
+        #expect(service.transcribeCalls.count >= 1)
+        // With no routing stage, "awaiting stage 2" should appear
+        #expect(logger.infos.contains { $0.contains("awaiting stage 2") })
     }
 
     // MARK: - onResult logs "awaiting stage 2"

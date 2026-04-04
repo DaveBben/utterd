@@ -7,6 +7,7 @@ public final class PipelineScheduler {
     private let store: any MemoStore
     private let clock: any Clock<Duration>
     private let pollingInterval: Duration
+    private let handlerTimeout: Duration
     private let logger: any WatcherLogger
     private let handler: @Sendable (MemoRecord) async -> Bool
 
@@ -17,12 +18,14 @@ public final class PipelineScheduler {
         store: any MemoStore,
         clock: any Clock<Duration> = ContinuousClock(),
         pollingInterval: Duration = .seconds(30),
+        handlerTimeout: Duration = .seconds(300),
         logger: any WatcherLogger,
         handler: @escaping @Sendable (MemoRecord) async -> Bool
     ) {
         self.store = store
         self.clock = clock
         self.pollingInterval = pollingInterval
+        self.handlerTimeout = handlerTimeout
         self.logger = logger
         self.handler = handler
     }
@@ -76,8 +79,21 @@ public final class PipelineScheduler {
             isLocked = true
             logger.info("Processing: \(record.fileURL.path)")
 
-            let succeeded = await handler(record)
-            if !succeeded {
+            let result = await withTaskGroup(of: Bool?.self, returning: Bool?.self) { group in
+                group.addTask { await self.handler(record) }
+                group.addTask {
+                    try? await self.clock.sleep(for: self.handlerTimeout)
+                    return nil
+                }
+                let first = await group.next()!
+                group.cancelAll()
+                return first
+            }
+
+            if result == nil {
+                logger.error("Handler timed out for \(record.fileURL.path), releasing lock")
+                releaseLock()
+            } else if result == false {
                 releaseLock()
             }
         }

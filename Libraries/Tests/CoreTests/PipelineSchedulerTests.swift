@@ -284,6 +284,75 @@ struct PipelineSchedulerTests {
         #expect(logger.infos.contains("Scheduler stopped"))
     }
 
+    // MARK: - Handler hang triggers timeout and releases lock
+
+    @Test func handlerThatHangsIsRecoveredByTimeout() async throws {
+        let store = MockMemoStore()
+        let record = makeRecord()
+        await store.setOldestUnprocessed(record)
+
+        let logger = MockWatcherLogger()
+        let handlerCallCount = ActorBox<Int>(0)
+
+        // Handler that never returns (simulates hang).
+        // With ImmediateClock the default 300s timeout fires instantly,
+        // releasing the lock and allowing repeated processing.
+        let scheduler = PipelineScheduler(
+            store: store,
+            clock: ImmediateClock(),
+            pollingInterval: .milliseconds(1),
+            logger: logger,
+            handler: { _ in
+                await handlerCallCount.increment()
+                try? await Task.sleep(for: .seconds(999))
+                return true
+            }
+        )
+
+        await scheduler.start()
+        try await Task.sleep(for: .milliseconds(200))
+        scheduler.stop()
+
+        // Timeout fires each cycle, so handler is called multiple times
+        let count = await handlerCallCount.get()
+        #expect(count >= 2)
+        #expect(logger.errors.contains { $0.contains("timed out") })
+    }
+
+    // MARK: - Handler timeout releases lock
+
+    @Test func handlerTimeoutReleasesLock() async throws {
+        let store = MockMemoStore()
+        let record = makeRecord()
+        await store.setOldestUnprocessed(record)
+
+        let logger = MockWatcherLogger()
+        let handlerCallCount = ActorBox<Int>(0)
+
+        // Handler hangs, but timeout is short
+        let scheduler = PipelineScheduler(
+            store: store,
+            clock: ImmediateClock(),
+            pollingInterval: .milliseconds(1),
+            handlerTimeout: .milliseconds(10),
+            logger: logger,
+            handler: { _ in
+                await handlerCallCount.increment()
+                try? await Task.sleep(for: .seconds(999))
+                return true
+            }
+        )
+
+        await scheduler.start()
+        try await Task.sleep(for: .milliseconds(200))
+        scheduler.stop()
+
+        // Handler should be called multiple times because timeout releases the lock
+        let count = await handlerCallCount.get()
+        #expect(count >= 2)
+        #expect(logger.errors.contains { $0.contains("timed out") })
+    }
+
     // MARK: - Processing log message includes file URL
 
     @Test func logsProcessingURL() async throws {

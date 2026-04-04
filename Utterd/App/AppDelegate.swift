@@ -159,7 +159,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func storeFileURL(logger: OSLogWatcherLogger) -> URL? {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            logger.error("Application Support directory not found")
+            return nil
+        }
         let dir = appSupport.appendingPathComponent("Utterd", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -270,6 +270,34 @@ struct JSONMemoStoreTests {
         #expect(result?.fileURL == processed.fileURL)
     }
 
+    // MARK: - Corruption resilience
+
+    @Test("Init with corrupt file starts empty and creates backup")
+    func initWithCorruptFileCreatesBackupAndStartsEmpty() async throws {
+        let storeURL = makeStoreURL()
+        try Data("not valid json".utf8).write(to: storeURL)
+
+        let store = JSONMemoStore(fileURL: storeURL)
+        let oldest = await store.oldestUnprocessed()
+        #expect(oldest == nil)
+
+        let backupURL = storeURL.appendingPathExtension("corrupt-backup")
+        #expect(FileManager.default.fileExists(atPath: backupURL.path))
+        let backupData = try Data(contentsOf: backupURL)
+        #expect(String(data: backupData, encoding: .utf8) == "not valid json")
+
+        try? FileManager.default.removeItem(at: storeURL)
+        try? FileManager.default.removeItem(at: backupURL)
+    }
+
+    @Test("Init with missing file starts empty")
+    func initWithMissingFileStartsEmpty() async {
+        let storeURL = makeStoreURL()
+        let store = JSONMemoStore(fileURL: storeURL)
+        let oldest = await store.oldestUnprocessed()
+        #expect(oldest == nil)
+    }
+
     // MARK: - Write failure
 
     @Test("insert throws writeFailed and leaves no partial state when file is unwritable")

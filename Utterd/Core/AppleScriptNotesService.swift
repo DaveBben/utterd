@@ -33,6 +33,17 @@ struct AppleScriptNotesService: NotesService {
         self.executor = executor
     }
 
+    /// Executes an AppleScript, mapping executor errors to `NotesServiceError`.
+    private func executeScript(_ script: String) async throws -> String {
+        do {
+            return try await executor.execute(script: script)
+        } catch NotesServiceError.automationPermissionDenied {
+            throw NotesServiceError.automationPermissionDenied
+        } catch {
+            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
+        }
+    }
+
     func listFolders(in parent: NotesFolder?) async throws -> [NotesFolder] {
         let script: String
         if let parent {
@@ -63,15 +74,7 @@ struct AppleScriptNotesService: NotesService {
                 """
         }
 
-        let raw: String
-        do {
-            raw = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
-
+        let raw = try await executeScript(script)
         return parseFolderLines(raw)
     }
 
@@ -104,13 +107,7 @@ struct AppleScriptNotesService: NotesService {
                         make new note at targetFolder with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
                     end tell
                     """
-                do {
-                    _ = try await executor.execute(script: script)
-                } catch NotesServiceError.automationPermissionDenied {
-                    throw NotesServiceError.automationPermissionDenied
-                } catch {
-                    throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-                }
+                _ = try await executeScript(script)
                 return .created
             } else {
                 try await createNoteInDefaultAccount(escapedTitle: escapedTitle, escapedBody: escapedBody)
@@ -133,14 +130,7 @@ struct AppleScriptNotesService: NotesService {
                 end try
             end tell
             """
-        let result: String
-        do {
-            result = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
+        let result = try await executeScript(script)
         return result.trimmingCharacters(in: .whitespacesAndNewlines) == "found"
     }
 
@@ -150,13 +140,7 @@ struct AppleScriptNotesService: NotesService {
                 make new note at default account with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
             end tell
             """
-        do {
-            _ = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
+        _ = try await executeScript(script)
     }
 
     func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool {
@@ -179,14 +163,7 @@ struct AppleScriptNotesService: NotesService {
                 end tell
                 """
         }
-        let result: String
-        do {
-            result = try await executor.execute(script: script)
-        } catch NotesServiceError.automationPermissionDenied {
-            throw NotesServiceError.automationPermissionDenied
-        } catch {
-            throw NotesServiceError.notesNotAccessible(error.localizedDescription)
-        }
+        let result = try await executeScript(script)
         return result.trimmingCharacters(in: .whitespacesAndNewlines) == "true"
     }
 }

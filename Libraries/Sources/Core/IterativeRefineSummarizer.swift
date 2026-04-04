@@ -18,13 +18,20 @@ public struct IterativeRefineSummarizer: TranscriptSummarizer {
             words[start..<min(start + chunkSize, words.count)].joined(separator: " ")
         }
 
+        // Reserve words for the prompt template text ("Update this summary…\n")
+        let promptOverhead = 8
+        let summaryBudget = max(1, contextBudget.availableForContent - chunkSize - promptOverhead)
         var rollingSummary = ""
         for (index, chunk) in chunks.enumerated() {
             let userPrompt: String
             if index == 0 {
                 userPrompt = "Summarize this transcript segment:\n\(chunk)"
             } else {
-                userPrompt = "Update this summary with the new content:\n\(rollingSummary)\n\(chunk)"
+                let truncatedSummary = rollingSummary
+                    .split(separator: " ")
+                    .prefix(summaryBudget)
+                    .joined(separator: " ")
+                userPrompt = "Update this summary with the new content:\n\(truncatedSummary)\n\(chunk)"
             }
             let systemPrompt = "You are a concise summarizer. Return only the summary text."
             rollingSummary = try await llmService.generate(systemPrompt: systemPrompt, userPrompt: userPrompt)

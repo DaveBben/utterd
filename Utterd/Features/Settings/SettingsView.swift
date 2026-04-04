@@ -21,7 +21,18 @@ struct SettingsView: View {
 
         Form {
             Section("Routing") {
-                Picker("Default Folder", selection: $settings.defaultFolderName) {
+                Picker("Default Folder", selection: Binding(
+                    get: { settings.defaultFolderName },
+                    set: { newName in
+                        settings.defaultFolderName = newName
+                        // Store the folder ID alongside the name for reliable resolution
+                        if let newName, let folder = model?.folders.first(where: { $0.name == newName }) {
+                            settings.defaultFolderID = folder.id
+                        } else {
+                            settings.defaultFolderID = nil
+                        }
+                    }
+                )) {
                     Text("System Default").tag(String?.none)
                     if let folders = model?.folders, !folders.isEmpty {
                         ForEach(folders, id: \.id) { folder in
@@ -33,9 +44,18 @@ struct SettingsView: View {
                 }
 
                 if let error = model?.fetchError {
-                    Text(error.localizedDescription)
-                        .foregroundStyle(.red)
+                    HStack {
+                        Text(error.localizedDescription)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                        Spacer()
+                        Button("Retry") {
+                            if let model {
+                                Task { await model.loadFolders() }
+                            }
+                        }
                         .font(.caption)
+                    }
                 }
             }
 
