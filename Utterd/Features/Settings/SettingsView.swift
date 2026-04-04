@@ -23,8 +23,12 @@ struct SettingsView: View {
             Section("Routing") {
                 Picker("Default Folder", selection: $settings.defaultFolderName) {
                     Text("System Default").tag(String?.none)
-                    ForEach(model?.folders ?? [], id: \.id) { folder in
-                        Text(folder.name).tag(Optional(folder.name))
+                    if let folders = model?.folders, !folders.isEmpty {
+                        ForEach(folders, id: \.id) { folder in
+                            Text(folder.name).tag(Optional(folder.name))
+                        }
+                    } else if let name = settings.defaultFolderName {
+                        Text(name).tag(Optional(name))
                     }
                 }
 
@@ -36,7 +40,10 @@ struct SettingsView: View {
             }
 
             Section("LLM") {
-                Toggle("Enable LLM Routing", isOn: $settings.llmEnabled)
+                Toggle("Enable Summarization", isOn: $settings.summarizationEnabled)
+                    .disabled(!isMacOS26OrLater)
+
+                Toggle("Enable Title Generation", isOn: $settings.titleGenerationEnabled)
                     .disabled(!isMacOS26OrLater)
 
                 if #unavailable(macOS 26) {
@@ -44,30 +51,10 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
-                if settings.llmEnabled {
-                    Picker("Routing Mode", selection: $settings.useCustomPrompt) {
-                        Text("Auto-route").tag(false)
-                        Text("Custom prompt").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-
-                    if settings.useCustomPrompt {
-                        TextEditor(text: $settings.customPrompt)
-                            .frame(minHeight: 150)
-                            .font(.body.monospaced())
-
-                        Button("Reset to Default") {
-                            settings.customPrompt = TranscriptClassifier.defaultCustomPrompt
-                        }
-                    }
-
-                    Toggle("Enable Summarization", isOn: $settings.summarizationEnabled)
-                }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: settings.llmEnabled && settings.useCustomPrompt ? 520 : 300)
+        .frame(width: 480, height: 300)
         .task {
             let routingModel = SettingsRoutingModel(notesService: notesService, settings: settings)
             model = routingModel

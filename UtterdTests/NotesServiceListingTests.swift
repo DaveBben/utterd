@@ -2,7 +2,7 @@ import Core
 import Testing
 @testable import Utterd
 
-@Suite("AppleScriptNotesService.listFolders and resolveHierarchy")
+@Suite("AppleScriptNotesService.listFolders")
 struct NotesServiceListingTests {
     // MARK: - AC-01.1: listFolders(in: nil) parses top-level folders
 
@@ -96,70 +96,4 @@ struct NotesServiceListingTests {
         }
     }
 
-    // MARK: - resolveHierarchy for top-level folder returns single-element array
-
-    @Test("resolveHierarchy for top-level folder returns single-element array")
-    func resolveHierarchyTopLevel() async throws {
-        let mock = MockScriptExecutor()
-        mock.executeResults = [.success("rootId\tFinance\t\n")]
-        let service = AppleScriptNotesService(executor: mock)
-        let folder = NotesFolder(id: "rootId", name: "Finance", containerID: nil)
-
-        let hierarchy = try await service.resolveHierarchy(for: folder)
-
-        #expect(hierarchy.count == 1)
-        #expect(hierarchy[0].id == "rootId")
-    }
-
-    // MARK: - AC-01.3: resolveHierarchy for nested folder returns root-to-leaf order
-
-    @Test("resolveHierarchy for nested folder returns root-to-leaf order")
-    func resolveHierarchyNested() async throws {
-        let mock = MockScriptExecutor()
-        mock.executeResults = [.success("parentId\tFinance\t\nchildId\tTaxes\tparentId\n")]
-        let service = AppleScriptNotesService(executor: mock)
-        let folder = NotesFolder(id: "childId", name: "Taxes", containerID: "parentId")
-
-        let hierarchy = try await service.resolveHierarchy(for: folder)
-
-        #expect(hierarchy.count == 2)
-        #expect(hierarchy[0].id == "parentId")
-        #expect(hierarchy[0].name == "Finance")
-        #expect(hierarchy[1].id == "childId")
-        #expect(hierarchy[1].name == "Taxes")
-    }
-
-    // MARK: - resolveHierarchy for deeply nested folder (3 levels) returns correct path
-
-    @Test("resolveHierarchy for deeply nested folder returns full root-to-leaf path")
-    func resolveHierarchyDeep() async throws {
-        let mock = MockScriptExecutor()
-        let bulkOutput = "rootId\tRoot\t\nmidId\tMid\trootId\nleafId\tLeaf\tmidId\n"
-        mock.executeResults = [.success(bulkOutput)]
-        let service = AppleScriptNotesService(executor: mock)
-        let folder = NotesFolder(id: "leafId", name: "Leaf", containerID: "midId")
-
-        let hierarchy = try await service.resolveHierarchy(for: folder)
-
-        #expect(hierarchy.count == 3)
-        #expect(hierarchy[0].id == "rootId")
-        #expect(hierarchy[1].id == "midId")
-        #expect(hierarchy[2].id == "leafId")
-    }
-
-    // MARK: - resolveHierarchy stops at unknown containerID (account root)
-
-    @Test("resolveHierarchy stops walking when containerID is not a folder (e.g. account)")
-    func resolveHierarchyUnknownContainerStopsAtRoot() async throws {
-        let mock = MockScriptExecutor()
-        // Bulk output only has the child — containerID "accountId" is the account, not a folder
-        mock.executeResults = [.success("childId\tTaxes\taccountId\n")]
-        let service = AppleScriptNotesService(executor: mock)
-        let folder = NotesFolder(id: "childId", name: "Taxes", containerID: "accountId")
-
-        let hierarchy = try await service.resolveHierarchy(for: folder)
-        // Walk stops at the unrecognized containerID — folder is treated as a root
-        #expect(hierarchy.count == 1)
-        #expect(hierarchy[0].id == "childId")
-    }
 }

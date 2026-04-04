@@ -7,26 +7,12 @@ import Core
 final class UserSettings {
 
     enum Keys {
-        static let llmEnabled = "llmEnabled"
         static let defaultFolderName = "defaultFolderName"
-        static let useCustomPrompt = "useCustomPrompt"
-        static let customPrompt = "customPrompt"
         static let summarizationEnabled = "summarizationEnabled"
+        static let titleGenerationEnabled = "titleGenerationEnabled"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
-
-    var llmEnabled: Bool {
-        get {
-            access(keyPath: \.llmEnabled)
-            return defaults.bool(forKey: Keys.llmEnabled)
-        }
-        set {
-            withMutation(keyPath: \.llmEnabled) {
-                defaults.set(newValue, forKey: Keys.llmEnabled)
-            }
-        }
-    }
 
     var defaultFolderName: String? {
         get {
@@ -36,30 +22,6 @@ final class UserSettings {
         set {
             withMutation(keyPath: \.defaultFolderName) {
                 defaults.set(newValue, forKey: Keys.defaultFolderName)
-            }
-        }
-    }
-
-    var useCustomPrompt: Bool {
-        get {
-            access(keyPath: \.useCustomPrompt)
-            return defaults.bool(forKey: Keys.useCustomPrompt)
-        }
-        set {
-            withMutation(keyPath: \.useCustomPrompt) {
-                defaults.set(newValue, forKey: Keys.useCustomPrompt)
-            }
-        }
-    }
-
-    var customPrompt: String {
-        get {
-            access(keyPath: \.customPrompt)
-            return defaults.string(forKey: Keys.customPrompt) ?? TranscriptClassifier.defaultCustomPrompt
-        }
-        set {
-            withMutation(keyPath: \.customPrompt) {
-                defaults.set(newValue, forKey: Keys.customPrompt)
             }
         }
     }
@@ -76,8 +38,23 @@ final class UserSettings {
         }
     }
 
+    var titleGenerationEnabled: Bool {
+        get {
+            access(keyPath: \.titleGenerationEnabled)
+            return defaults.bool(forKey: Keys.titleGenerationEnabled)
+        }
+        set {
+            withMutation(keyPath: \.titleGenerationEnabled) {
+                defaults.set(newValue, forKey: Keys.titleGenerationEnabled)
+            }
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        defaults.removeObject(forKey: "useCustomPrompt")
+        defaults.removeObject(forKey: "customPrompt")
+        defaults.removeObject(forKey: "llmEnabled")
     }
 
     func toRoutingConfiguration() -> RoutingConfiguration {
@@ -85,23 +62,10 @@ final class UserSettings {
     }
 
     nonisolated static func readRoutingConfiguration(from defaults: UserDefaults = .standard) -> RoutingConfiguration {
-        let llmEnabled = defaults.bool(forKey: Keys.llmEnabled)
-        let useCustomPrompt = defaults.bool(forKey: Keys.useCustomPrompt)
-        let customPrompt = defaults.string(forKey: Keys.customPrompt) ?? TranscriptClassifier.defaultCustomPrompt
-        let summarizationEnabled = defaults.bool(forKey: Keys.summarizationEnabled)
-        let defaultFolderName = defaults.string(forKey: Keys.defaultFolderName)
-        let approach: RoutingConfiguration.LLMApproach
-        if !llmEnabled {
-            approach = .disabled
-        } else if useCustomPrompt {
-            approach = .customPrompt(customPrompt)
-        } else {
-            approach = .autoRoute
-        }
-        return RoutingConfiguration(
-            llmApproach: approach,
-            defaultFolderName: defaultFolderName,
-            summarizationEnabled: summarizationEnabled
+        RoutingConfiguration(
+            summarizationEnabled: defaults.bool(forKey: Keys.summarizationEnabled),
+            titleGenerationEnabled: defaults.bool(forKey: Keys.titleGenerationEnabled),
+            defaultFolderName: defaults.string(forKey: Keys.defaultFolderName)
         )
     }
 }

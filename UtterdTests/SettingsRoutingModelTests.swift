@@ -14,7 +14,6 @@ final class MockNotesServiceForSettings: NotesService, @unchecked Sendable {
         return listFoldersResult
     }
 
-    func resolveHierarchy(for folder: NotesFolder) async throws -> [NotesFolder] { fatalError() }
     func createNote(title: String, body: String, in folder: NotesFolder?) async throws -> NoteCreationResult { fatalError() }
     func noteExists(title: String, in folder: NotesFolder?) async throws -> Bool { fatalError() }
 }

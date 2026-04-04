@@ -2,8 +2,8 @@
 
 A macOS menu bar daemon that automatically turns voice memos into Apple Notes.
 It monitors the iCloud Voice Memos sync directory, transcribes audio on-device
-(macOS 26+), and uses a language model to pick the right Notes folder (summarization is supported but not yet enabled) — no manual intervention after setup. Built for a single
-user who wants frictionless voice capture without thinking about where things go.
+(macOS 26+), and optionally uses an on-device language model to summarize transcripts and generate descriptive titles
+— no manual intervention after setup. Built for a single user who wants frictionless voice capture without thinking about where things go.
 
 ## Tech Stack and Codebase Map
 

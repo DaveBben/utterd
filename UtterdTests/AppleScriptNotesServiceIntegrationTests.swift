@@ -186,25 +186,6 @@ struct AppleScriptNotesServiceFolderIntegrationTests {
         }
     }
 
-    // MARK: - AC-01.3: resolveHierarchy returns at least the folder itself
-
-    @Test("resolveHierarchy for a top-level folder returns array containing that folder")
-    func resolveHierarchyContainsFolderItself() async throws {
-        try await requireNotesAccess()
-
-        let folders = try await service.listFolders(in: nil)
-
-        guard let first = folders.first else {
-            // No custom folders in this environment — nothing to assert.
-            return
-        }
-
-        let hierarchy = try await service.resolveHierarchy(for: first)
-
-        #expect(hierarchy.count >= 1)
-        #expect(hierarchy.last == first)
-    }
-
     // MARK: - AC-01.2: listFolders(in: folder) returns children (environment-dependent)
 
     @Test("listFolders(in: folder) returns subfolders when they exist")
