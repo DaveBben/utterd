@@ -1,7 +1,7 @@
 # Tasks: Immediate Queue-Based Pipeline
 
 **Plan**: [plan.md](plan.md)
-**Status**: Approved
+**Status**: In Progress
 **Created**: 2026-04-04
 
 ---

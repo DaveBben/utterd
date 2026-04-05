@@ -6,10 +6,14 @@ public struct MemoRecord: Codable, Sendable, Equatable {
     public let fileURL: URL
     public let dateCreated: Date
     public var dateProcessed: Date?
+    public var dateFailed: Date?
+    public var failureReason: String?
 
-    public init(fileURL: URL, dateCreated: Date, dateProcessed: Date? = nil) {
+    public init(fileURL: URL, dateCreated: Date, dateProcessed: Date? = nil, dateFailed: Date? = nil, failureReason: String? = nil) {
         self.fileURL = fileURL
         self.dateCreated = dateCreated
         self.dateProcessed = dateProcessed
+        self.dateFailed = dateFailed
+        self.failureReason = failureReason
     }
 }

@@ -75,6 +75,14 @@ public actor JSONMemoStore: MemoStore {
         }
     }
 
+    public func markFailed(fileURL: URL, reason: String, date: Date) throws {
+        fatalError("Not yet implemented — see Task 1")
+    }
+
+    public func allUnprocessed() -> [MemoRecord] {
+        fatalError("Not yet implemented — see Task 1")
+    }
+
     // MARK: - Private
 
     private func write() throws {
