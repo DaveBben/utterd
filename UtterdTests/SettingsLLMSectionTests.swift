@@ -46,4 +46,19 @@ struct SettingsLLMSectionTests {
         #expect(config.summarizationEnabled == false)
         #expect(config.titleGenerationEnabled == true)
     }
+
+    @Test("summarizationInstructions threads through toRoutingConfiguration")
+    @MainActor
+    func summarizationInstructionsThreadsThroughConfig() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        settings.summarizationEnabled = true
+        settings.summarizationInstructions = "Be concise and focus on decisions"
+
+        let config = settings.toRoutingConfiguration()
+        #expect(config.summarizationInstructions == "Be concise and focus on decisions")
+    }
 }

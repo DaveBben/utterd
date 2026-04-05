@@ -11,6 +11,7 @@ final class UserSettings {
         static let defaultFolderID = "defaultFolderID"
         static let summarizationEnabled = "summarizationEnabled"
         static let titleGenerationEnabled = "titleGenerationEnabled"
+        static let summarizationInstructions = "summarizationInstructions"
         static let migrationVersion = "migrationVersion"
         // Legacy keys removed during migration v1
         static let useCustomPrompt = "useCustomPrompt"
@@ -56,6 +57,18 @@ final class UserSettings {
         }
     }
 
+    var summarizationInstructions: String? {
+        get {
+            access(keyPath: \.summarizationInstructions)
+            return defaults.string(forKey: Keys.summarizationInstructions)
+        }
+        set {
+            withMutation(keyPath: \.summarizationInstructions) {
+                defaults.set(newValue, forKey: Keys.summarizationInstructions)
+            }
+        }
+    }
+
     var titleGenerationEnabled: Bool {
         get {
             access(keyPath: \.titleGenerationEnabled)
@@ -89,7 +102,8 @@ final class UserSettings {
             summarizationEnabled: defaults.bool(forKey: Keys.summarizationEnabled),
             titleGenerationEnabled: defaults.bool(forKey: Keys.titleGenerationEnabled),
             defaultFolderName: defaults.string(forKey: Keys.defaultFolderName),
-            defaultFolderID: defaults.string(forKey: Keys.defaultFolderID)
+            defaultFolderID: defaults.string(forKey: Keys.defaultFolderID),
+            summarizationInstructions: defaults.string(forKey: Keys.summarizationInstructions)
         )
     }
 }

@@ -106,6 +106,58 @@ struct UserSettingsTests {
         #expect(config.defaultFolderName == "Work")
     }
 
+    @Test("summarizationInstructions defaults to nil on fresh UserDefaults")
+    @MainActor
+    func summarizationInstructionsDefaultsToNil() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+
+        #expect(settings.summarizationInstructions == nil)
+    }
+
+    @Test("summarizationInstructions persists across re-init")
+    @MainActor
+    func summarizationInstructionsPersists() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        settings.summarizationInstructions = "Focus on action items"
+
+        let reloaded = UserSettings(defaults: defaults)
+        #expect(reloaded.summarizationInstructions == "Focus on action items")
+    }
+
+    @Test("toRoutingConfiguration maps summarizationInstructions")
+    @MainActor
+    func routingConfigMapsSummarizationInstructions() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        settings.summarizationInstructions = "Focus on action items"
+
+        let config = settings.toRoutingConfiguration()
+        #expect(config.summarizationInstructions == "Focus on action items")
+    }
+
+    @Test("readRoutingConfiguration maps summarizationInstructions from UserDefaults")
+    func readRoutingConfigurationMapsSummarizationInstructions() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set("Focus on action items", forKey: "summarizationInstructions")
+
+        let config = UserSettings.readRoutingConfiguration(from: defaults)
+        #expect(config.summarizationInstructions == "Focus on action items")
+    }
+
     @Test("stale UserDefaults keys removed on init")
     @MainActor
     func staleKeyCleanup() {
