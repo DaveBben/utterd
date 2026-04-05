@@ -2,6 +2,8 @@ import Core
 import SwiftUI
 
 struct SettingsView: View {
+    private static let maxInstructionWords = 300
+
     @Environment(UserSettings.self) private var settings
     @State private var model: SettingsRoutingModel?
 
@@ -81,13 +83,13 @@ struct SettingsView: View {
                         TextEditor(text: Binding(
                             get: { settings.summarizationInstructions ?? "" },
                             set: { newValue in
-                                let enforced = enforceWordLimit(newValue, limit: 300)
+                                let enforced = enforceWordLimit(newValue, limit: Self.maxInstructionWords)
                                 settings.summarizationInstructions = enforced.isEmpty ? nil : enforced
                             }
                         ))
                         .frame(height: 80)
                         .font(.body)
-                        Text("\(wordCount(settings.summarizationInstructions ?? "")) / 300 words")
+                        Text("\(wordCount(settings.summarizationInstructions ?? "")) / \(Self.maxInstructionWords) words")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

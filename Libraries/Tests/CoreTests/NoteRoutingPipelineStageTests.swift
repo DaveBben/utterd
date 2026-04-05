@@ -879,7 +879,7 @@ struct NoteRoutingPipelineStageTests {
         #expect(!llm.calls[0].systemPrompt.contains("Be brief"))
     }
 
-    // MARK: - Test 26 (original): Both summarization and title generation both throw
+    // MARK: - Test 30: Both summarization and title generation both throw
 
     @Test
     func bothOnBothThrow() async throws {

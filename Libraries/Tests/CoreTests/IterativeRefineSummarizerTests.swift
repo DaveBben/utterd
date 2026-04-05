@@ -295,7 +295,7 @@ struct IterativeRefineSummarizerTests {
     }
 
     @Test
-    func budgetClampingPreventscrashWhenInstructionsExceedTotalWords() async throws {
+    func budgetClampingPreventsCrashWhenInstructionsExceedTotalWords() async throws {
         // totalWords=210, systemOverhead=200, instructions=20 words
         // Unclamped overhead = 200+20 = 220 which exceeds totalWords=210 -> would fatalError
         // Clamped overhead = min(220, 210-1) = 209
