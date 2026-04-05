@@ -41,7 +41,6 @@ struct TranscriptionPipelineStageTests {
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: MockMemoStore(),
             logger: MockWatcherLogger()
         )
 
@@ -66,7 +65,6 @@ struct TranscriptionPipelineStageTests {
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: MockMemoStore(),
             logger: MockWatcherLogger()
         )
 
@@ -89,7 +87,6 @@ struct TranscriptionPipelineStageTests {
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: MockMemoStore(),
             logger: MockWatcherLogger()
         )
 
@@ -113,7 +110,6 @@ struct TranscriptionPipelineStageTests {
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: MockMemoStore(),
             logger: MockWatcherLogger()
         )
 
@@ -141,7 +137,6 @@ struct TranscriptionPipelineStageTests {
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: MockMemoStore(),
             logger: MockWatcherLogger()
         )
 
@@ -151,9 +146,9 @@ struct TranscriptionPipelineStageTests {
         #expect(result?.transcript == "")
     }
 
-    // MARK: - Failure: transcription error logs, calls markProcessed, returns nil
+    // MARK: - Failure: transcription error logs, returns nil, does not call store
 
-    @Test func transcriptionFailureLogsAndCallsMarkProcessed() async throws {
+    @Test func transcriptionFailureLogsAndDoesNotCallStore() async throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
@@ -164,12 +159,10 @@ struct TranscriptionPipelineStageTests {
         let service = MockTranscriptionService()
         service.error = TranscriptionError()
 
-        let store = MockMemoStore()
         let logger = MockWatcherLogger()
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: store,
             logger: logger
         )
 
@@ -177,24 +170,19 @@ struct TranscriptionPipelineStageTests {
 
         #expect(result == nil)
         #expect(!logger.errors.isEmpty)
-        let calls = await store.markProcessedCalls
-        #expect(calls.count == 1)
-        #expect(calls[0].fileURL == fileURL)
     }
 
     // MARK: - Failure: copy fails when file does not exist
 
-    @Test func missingFileCausesFailureAndCallsMarkProcessed() async throws {
+    @Test func missingFileCausesFailureAndDoesNotCallStore() async throws {
         let missingURL = URL(fileURLWithPath: "/nonexistent/path/memo.m4a")
         let record = MemoRecord(fileURL: missingURL, dateCreated: Date())
 
         let service = MockTranscriptionService()
-        let store = MockMemoStore()
         let logger = MockWatcherLogger()
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: store,
             logger: logger
         )
 
@@ -202,9 +190,6 @@ struct TranscriptionPipelineStageTests {
 
         #expect(result == nil)
         #expect(!logger.errors.isEmpty)
-        let calls = await store.markProcessedCalls
-        #expect(calls.count == 1)
-        #expect(calls[0].fileURL == missingURL)
     }
 
     // MARK: - Failure: temp file cleaned up after error
@@ -222,7 +207,6 @@ struct TranscriptionPipelineStageTests {
 
         let stage = TranscriptionPipelineStage(
             transcriptionService: service,
-            store: MockMemoStore(),
             logger: MockWatcherLogger()
         )
 

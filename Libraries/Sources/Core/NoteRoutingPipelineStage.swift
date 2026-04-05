@@ -1,8 +1,14 @@
 import Foundation
 
-/// Pipeline Stage 2: routes a transcription result into a Notes folder
-/// and creates the note. Calls `onComplete` after every code path to release
-/// the pipeline lock.
+public enum NoteRoutingResult: Sendable, Equatable {
+    case success
+    case failure(reason: String)
+    case cancelled
+}
+
+/// Pipeline Stage 2: routes a transcription result into a Notes folder and creates the note.
+/// Returns a `NoteRoutingResult` indicating the outcome. On success, marks the record as
+/// processed. On failure or cancellation, the caller is responsible for any store updates.
 public final class NoteRoutingPipelineStage: Sendable {
     private let notesService: any NotesService
     private let llmService: any LLMService
@@ -11,7 +17,6 @@ public final class NoteRoutingPipelineStage: Sendable {
     private let logger: any WatcherLogger
     private let configProvider: @Sendable () -> RoutingConfiguration
     private let contextBudget: LLMContextBudget
-    private let onComplete: @Sendable () async -> Void
 
     private static let maxTitleInputWords = 2000
     private static let maxTitleLength = 100
@@ -23,8 +28,7 @@ public final class NoteRoutingPipelineStage: Sendable {
         store: any MemoStore,
         logger: any WatcherLogger,
         configProvider: @escaping @Sendable () -> RoutingConfiguration,
-        contextBudget: LLMContextBudget,
-        onComplete: @escaping @Sendable () async -> Void
+        contextBudget: LLMContextBudget
     ) {
         self.notesService = notesService
         self.llmService = llmService
@@ -33,10 +37,10 @@ public final class NoteRoutingPipelineStage: Sendable {
         self.logger = logger
         self.configProvider = configProvider
         self.contextBudget = contextBudget
-        self.onComplete = onComplete
     }
 
-    public func route(_ result: TranscriptionResult) async {
+    @discardableResult
+    public func route(_ result: TranscriptionResult) async -> NoteRoutingResult {
         let transcript = result.transcript
         let fileURL = result.fileURL
         let now = Date()
@@ -45,18 +49,20 @@ public final class NoteRoutingPipelineStage: Sendable {
             try await routeCore(transcript: transcript, now: now)
         } catch is CancellationError {
             logger.info("NoteRoutingPipelineStage: cancelled for \(fileURL.lastPathComponent)")
-            await onComplete()
-            return
+            return .cancelled
         } catch {
             logger.error("Note routing failed: \(error)")
+            return .failure(reason: error.localizedDescription)
         }
 
         do {
             try await store.markProcessed(fileURL: fileURL, date: now)
         } catch {
+            // Note was created successfully; markProcessed failure means this record may be
+            // re-processed on restart, creating a duplicate note — accepted tradeoff (plan edge case 7)
             logger.error("NoteRoutingPipelineStage: failed to mark processed \(fileURL.lastPathComponent): \(error)")
         }
-        await onComplete()
+        return .success
     }
 
     // MARK: - Private

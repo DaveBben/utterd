@@ -99,4 +99,56 @@ struct MemoConsumerTests {
         // Both events should have been attempted and logged
         #expect(logger.errors.count == 2)
     }
+
+    @Test func memoConsumerCallsOnRecordInserted() async throws {
+        let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let receivedRecords = ActorBox<[MemoRecord]>([])
+
+        let consumer = MemoConsumer(
+            store: store,
+            logger: logger,
+            now: { self.fixedDate },
+            onRecordInserted: { record in
+                Task { await receivedRecords.append(record) }
+            }
+        )
+
+        let event = VoiceMemoEvent(fileURL: memoURL, fileSize: 1000)
+        await consumer.consume(makeStream(events: [event]))
+
+        for _ in 0..<50 {
+            if await receivedRecords.get().count >= 1 { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        let received = await receivedRecords.get()
+        #expect(received.count == 1)
+        #expect(received[0].fileURL == memoURL)
+    }
+
+    @Test func onRecordInsertedNotCalledOnInsertFailure() async throws {
+        let store = MockMemoStore()
+        let logger = MockWatcherLogger()
+        let callCount = ActorBox<Int>(0)
+
+        struct StoreWriteError: Error {}
+        await store.setInsertError(StoreWriteError())
+
+        let consumer = MemoConsumer(
+            store: store,
+            logger: logger,
+            now: { self.fixedDate },
+            onRecordInserted: { _ in
+                Task { await callCount.increment() }
+            }
+        )
+
+        let event = VoiceMemoEvent(fileURL: memoURL, fileSize: 1000)
+        await consumer.consume(makeStream(events: [event]))
+
+        await Task.yield()
+
+        #expect(await callCount.get() == 0)
+    }
 }

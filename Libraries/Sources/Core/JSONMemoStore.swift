@@ -50,7 +50,7 @@ public actor JSONMemoStore: MemoStore {
 
     public func oldestUnprocessed() -> MemoRecord? {
         records
-            .filter { $0.dateProcessed == nil }
+            .filter { $0.dateProcessed == nil && $0.dateFailed == nil }
             .min(by: { $0.dateCreated < $1.dateCreated })
     }
 
@@ -73,6 +73,30 @@ public actor JSONMemoStore: MemoStore {
             records[index].dateProcessed = previousDate
             throw MemoStoreError.writeFailed(fileURL, underlying: error)
         }
+    }
+
+    public func markFailed(fileURL: URL, reason: String, date: Date) throws {
+        let normalized = fileURL.standardizedFileURL
+        guard let index = records.firstIndex(where: { $0.fileURL.standardizedFileURL == normalized }) else {
+            throw MemoStoreError.recordNotFound(fileURL)
+        }
+        let previousFailed = records[index].dateFailed
+        let previousReason = records[index].failureReason
+        records[index].dateFailed = date
+        records[index].failureReason = reason
+        do {
+            try write()
+        } catch {
+            records[index].dateFailed = previousFailed
+            records[index].failureReason = previousReason
+            throw MemoStoreError.writeFailed(self.fileURL, underlying: error)
+        }
+    }
+
+    public func allUnprocessed() -> [MemoRecord] {
+        records
+            .filter { $0.dateProcessed == nil && $0.dateFailed == nil }
+            .sorted(by: { $0.dateCreated < $1.dateCreated })
     }
 
     // MARK: - Private

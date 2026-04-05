@@ -4,8 +4,11 @@ import Foundation
 actor MockMemoStore: MemoStore {
     var insertedRecords: [MemoRecord] = []
     var markProcessedCalls: [(fileURL: URL, date: Date)] = []
+    var markFailedCalls: [(fileURL: URL, reason: String, date: Date)] = []
+    var failedURLs: Set<URL> = []
     var insertError: Error?
     var oldestUnprocessedResult: MemoRecord?
+    var allUnprocessedResult: [MemoRecord] = []
     var mostRecentlyProcessedResult: MemoRecord?
     var mostRecentlyProcessedCallCount: Int = 0
 
@@ -21,7 +24,17 @@ actor MockMemoStore: MemoStore {
     }
 
     func oldestUnprocessed() async -> MemoRecord? {
-        oldestUnprocessedResult
+        guard let result = oldestUnprocessedResult else { return nil }
+        return failedURLs.contains(result.fileURL) ? nil : result
+    }
+
+    func markFailed(fileURL: URL, reason: String, date: Date) async throws {
+        markFailedCalls.append((fileURL: fileURL, reason: reason, date: date))
+        failedURLs.insert(fileURL)
+    }
+
+    func allUnprocessed() async -> [MemoRecord] {
+        allUnprocessedResult
     }
 
     func mostRecentlyProcessed() async -> MemoRecord? {

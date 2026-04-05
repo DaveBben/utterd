@@ -3,20 +3,17 @@ import Foundation
 /// Handles the transcription step of the pipeline for a single `MemoRecord`.
 ///
 /// Copies the audio file to a temp location, transcribes it, and returns the result.
-/// On failure (file copy or transcription error), marks the record as processed
-/// via `store.markProcessed` to prevent infinite re-processing.
+/// On failure (file copy or transcription error), returns nil. The caller is responsible
+/// for marking the record as failed or processed.
 public final class TranscriptionPipelineStage: Sendable {
     private let transcriptionService: any TranscriptionService
-    private let store: any MemoStore
     private let logger: any WatcherLogger
 
     public init(
         transcriptionService: any TranscriptionService,
-        store: any MemoStore,
         logger: any WatcherLogger
     ) {
         self.transcriptionService = transcriptionService
-        self.store = store
         self.logger = logger
     }
 
@@ -31,7 +28,6 @@ public final class TranscriptionPipelineStage: Sendable {
             try FileManager.default.copyItem(at: record.fileURL, to: tempURL)
         } catch {
             logger.error("TranscriptionPipelineStage: failed to copy \(record.fileURL.lastPathComponent): \(error)")
-            try? await store.markProcessed(fileURL: record.fileURL, date: Date())
             return nil
         }
 
@@ -50,7 +46,6 @@ public final class TranscriptionPipelineStage: Sendable {
         } catch {
             logger.error("TranscriptionPipelineStage: transcription failed for \(record.fileURL.lastPathComponent): \(error)")
             cleanUpTempFile(at: tempURL)
-            try? await store.markProcessed(fileURL: record.fileURL, date: Date())
             return nil
         }
     }

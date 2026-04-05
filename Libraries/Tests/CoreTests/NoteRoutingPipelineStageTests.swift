@@ -32,8 +32,7 @@ struct NoteRoutingPipelineStageTests {
         store: MockMemoStore,
         logger: MockWatcherLogger = MockWatcherLogger(),
         config: RoutingConfiguration = RoutingConfiguration(),
-        contextBudget: LLMContextBudget,
-        completeCounter: ActorBox<Int> = ActorBox(0)
+        contextBudget: LLMContextBudget
     ) -> NoteRoutingPipelineStage {
         NoteRoutingPipelineStage(
             notesService: notesService,
@@ -42,8 +41,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             configProvider: { config },
-            contextBudget: contextBudget,
-            onComplete: { await completeCounter.increment() }
+            contextBudget: contextBudget
         )
     }
 
@@ -108,7 +106,6 @@ struct NoteRoutingPipelineStageTests {
         let summarizer = MockTranscriptSummarizer()
         let store = MockMemoStore()
         let logger = MockWatcherLogger()
-        let completeCounter = ActorBox(0)
         let fileURL = makeURL()
         let stage = makeStage(
             notesService: notes,
@@ -117,8 +114,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(),
-            contextBudget: smallBudget(),
-            completeCounter: completeCounter
+            contextBudget: smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "", fileURL: fileURL)
@@ -128,11 +124,10 @@ struct NoteRoutingPipelineStageTests {
         #expect(llm.calls.isEmpty)
         #expect(summarizer.calls.isEmpty)
         #expect(notes.createNoteCalls.isEmpty)
-        // But markProcessed and onComplete still fire
+        // markProcessed still fires (empty transcript succeeds through routeCore)
         let markCalls = await store.markProcessedCalls
         #expect(markCalls.count == 1)
         #expect(markCalls[0].fileURL == fileURL)
-        #expect(await completeCounter.get() == 1)
         #expect(logger.warnings.contains { $0.contains("Empty transcript") })
     }
 
@@ -214,61 +209,81 @@ struct NoteRoutingPipelineStageTests {
         #expect(logger.warnings.count >= 1)
     }
 
-    // MARK: - Test 6: markProcessed + onComplete run exactly once on success path
+    // MARK: - Test 6: markProcessed called exactly once and route() returns .success
 
     @Test
-    func markProcessedAndOnCompleteRunExactlyOnceOnSuccessPath() async throws {
+    func successPathCallsMarkProcessedAndReturnsSuccess() async throws {
         let notes = MockNotesService()
         notes.createNoteResult = .created
 
         let store = MockMemoStore()
-        let completeCounter = ActorBox(0)
         let stage = makeStage(
             notesService: notes,
             store: store,
-            contextBudget: smallBudget(),
-            completeCounter: completeCounter
+            contextBudget: smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "hello", fileURL: makeURL())
-        await stage.route(result)
+        let routeResult = await stage.route(result)
 
         let markCalls = await store.markProcessedCalls
         #expect(markCalls.count == 1)
-        #expect(await completeCounter.get() == 1)
+        #expect(routeResult == .success)
     }
 
-    // MARK: - Test 7: markProcessed + onComplete run exactly once on error path (createNote throws)
+    // MARK: - Test 7: route() returns .failure and does NOT call markProcessed when createNote throws
 
     @Test
-    func markProcessedAndOnCompleteRunExactlyOnceOnErrorPath() async throws {
+    func noteCreationFailureReturnsDotFailureAndDoesNotCallMarkProcessed() async throws {
         let notes = MockNotesService()
-        struct NoteError: Error {}
+        struct NoteError: Error, LocalizedError {
+            var errorDescription: String? { "note creation failed" }
+        }
         notes.createNoteError = NoteError()
 
         let store = MockMemoStore()
         let logger = MockWatcherLogger()
-        let completeCounter = ActorBox(0)
         let fileURL = makeURL()
-        let stage = NoteRoutingPipelineStage(
+        let stage = makeStage(
             notesService: notes,
-            llmService: MockLLMService(),
-            summarizer: MockTranscriptSummarizer(),
             store: store,
             logger: logger,
-            configProvider: { RoutingConfiguration() },
-            contextBudget: smallBudget(),
-            onComplete: { await completeCounter.increment() }
+            contextBudget: smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "hello", fileURL: fileURL)
-        await stage.route(result)
+        let routeResult = await stage.route(result)
 
         let markCalls = await store.markProcessedCalls
-        #expect(markCalls.count == 1)
-        #expect(markCalls[0].fileURL == fileURL)
-        #expect(await completeCounter.get() == 1)
+        #expect(markCalls.count == 0)
         #expect(!logger.errors.isEmpty)
+        if case .failure(let reason) = routeResult {
+            #expect(!reason.isEmpty)
+        } else {
+            Issue.record("Expected .failure but got \(routeResult)")
+        }
+    }
+
+    // MARK: - Test 7b: cancellation returns .cancelled without calling markProcessed
+
+    @Test
+    func cancellationReturnsCancelledResult() async throws {
+        let notes = MockNotesService()
+        notes.createNoteError = CancellationError()
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            store: store,
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "hello", fileURL: makeURL())
+        let routeResult = await stage.route(result)
+
+        let markCalls = await store.markProcessedCalls
+        #expect(markCalls.count == 0)
+        #expect(routeResult == .cancelled)
     }
 
     // MARK: - Test 8: Summarization with short transcript (fits budget)

@@ -13,5 +13,7 @@ public protocol MemoStore: Sendable {
     func contains(fileURL: URL) async -> Bool
     func oldestUnprocessed() async -> MemoRecord?
     func markProcessed(fileURL: URL, date: Date) async throws
+    func markFailed(fileURL: URL, reason: String, date: Date) async throws
+    func allUnprocessed() async -> [MemoRecord]
     func mostRecentlyProcessed() async -> MemoRecord?
 }
