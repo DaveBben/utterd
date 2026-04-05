@@ -776,7 +776,110 @@ struct NoteRoutingPipelineStageTests {
         #expect(notes.createNoteCalls[0].folder?.id == "id-A")
     }
 
-    // MARK: - Test 26: Both summarization and title generation both throw
+    // MARK: - Test 26: Instructions pass-through — summarizationInstructions forwarded to summarizer
+
+    @Test
+    func summarizationInstructionsForwardedToSummarizer() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "A summary"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: true, summarizationInstructions: "Be brief"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(summarizer.calls.count == 1)
+        #expect(summarizer.calls[0].instructions == "Be brief")
+    }
+
+    // MARK: - Test 27: Instructions pass-through — nil summarizationInstructions forwarded as nil
+
+    @Test
+    func nilSummarizationInstructionsForwardedAsNil() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+        summarizer.result = "A summary"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: true, summarizationInstructions: nil),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(summarizer.calls.count == 1)
+        #expect(summarizer.calls[0].instructions == nil)
+    }
+
+    // MARK: - Test 28: Instructions set but summarization disabled → summarizer never called
+
+    @Test
+    func summarizationDisabledWithInstructionsSetDoesNotCallSummarizer() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let summarizer = MockTranscriptSummarizer()
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            summarizer: summarizer,
+            store: store,
+            config: RoutingConfiguration(summarizationEnabled: false, summarizationInstructions: "Be brief"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(summarizer.calls.isEmpty)
+    }
+
+    // MARK: - Test 29: Instructions set + title generation → LLM prompt has no summarization instructions
+
+    @Test
+    func titleGenerationSystemPromptDoesNotContainSummarizationInstructions() async throws {
+        let notes = MockNotesService()
+        notes.createNoteResult = .created
+
+        let llm = MockLLMService()
+        llm.result = "Generated Title"
+
+        let store = MockMemoStore()
+        let stage = makeStage(
+            notesService: notes,
+            llmService: llm,
+            store: store,
+            config: RoutingConfiguration(titleGenerationEnabled: true, summarizationInstructions: "Be brief"),
+            contextBudget: smallBudget()
+        )
+
+        let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
+        await stage.route(result)
+
+        #expect(llm.calls.count == 1)
+        #expect(llm.calls[0].systemPrompt.lowercased().contains("title"))
+        #expect(!llm.calls[0].systemPrompt.contains("Be brief"))
+    }
+
+    // MARK: - Test 26 (original): Both summarization and title generation both throw
 
     @Test
     func bothOnBothThrow() async throws {
