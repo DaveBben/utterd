@@ -2,7 +2,7 @@
 
 **Plan**: docs/plans/summarization-instructions/plan.md
 **Date**: 2026-04-05
-**Status**: Approved
+**Status**: In Progress
 
 ---
 

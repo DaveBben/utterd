@@ -6,10 +6,10 @@ import Foundation
 final class MockTranscriptSummarizer: TranscriptSummarizer, @unchecked Sendable {
     nonisolated(unsafe) var result: String = ""
     nonisolated(unsafe) var error: Error?
-    nonisolated(unsafe) var calls: [(transcript: String, contextBudget: LLMContextBudget)] = []
+    nonisolated(unsafe) var calls: [(transcript: String, contextBudget: LLMContextBudget, instructions: String?)] = []
 
-    func summarize(transcript: String, contextBudget: LLMContextBudget) async throws -> String {
-        calls.append((transcript: transcript, contextBudget: contextBudget))
+    func summarize(transcript: String, contextBudget: LLMContextBudget, instructions: String?) async throws -> String {
+        calls.append((transcript: transcript, contextBudget: contextBudget, instructions: instructions))
         if let error { throw error }
         return result
     }

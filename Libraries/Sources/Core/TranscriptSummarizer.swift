@@ -3,5 +3,5 @@
 /// Concrete implementations receive the `LLMService` at init time,
 /// keeping the call site free of LLM details.
 public protocol TranscriptSummarizer: Sendable {
-    func summarize(transcript: String, contextBudget: LLMContextBudget) async throws -> String
+    func summarize(transcript: String, contextBudget: LLMContextBudget, instructions: String?) async throws -> String
 }

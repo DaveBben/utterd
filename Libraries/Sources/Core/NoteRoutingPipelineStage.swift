@@ -85,7 +85,8 @@ public final class NoteRoutingPipelineStage: Sendable {
                 try Task.checkCancellation()
                 let summary = try await summarizer.summarize(
                     transcript: transcript,
-                    contextBudget: contextBudget
+                    contextBudget: contextBudget,
+                    instructions: config.summarizationInstructions
                 )
                 if !summary.isEmpty {
                     body = summary

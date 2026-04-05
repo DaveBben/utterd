@@ -11,7 +11,7 @@ public struct IterativeRefineSummarizer: TranscriptSummarizer {
         self.llmService = llmService
     }
 
-    public func summarize(transcript: String, contextBudget: LLMContextBudget) async throws -> String {
+    public func summarize(transcript: String, contextBudget: LLMContextBudget, instructions: String? = nil) async throws -> String {
         let words = transcript.split(whereSeparator: \.isWhitespace).map(String.init)
         let chunkSize = contextBudget.availableForNewChunk
         let chunks = stride(from: 0, to: words.count, by: chunkSize).map { start in
