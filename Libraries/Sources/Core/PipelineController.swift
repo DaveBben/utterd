@@ -35,7 +35,6 @@ public final class PipelineController {
     public func start() async {
         let stage = TranscriptionPipelineStage(
             transcriptionService: transcriptionService,
-            store: store,
             logger: logger
         )
 
