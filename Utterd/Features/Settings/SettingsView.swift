@@ -71,6 +71,28 @@ struct SettingsView: View {
                 Toggle("Enable Summarization", isOn: $settings.summarizationEnabled)
                     .disabled(!isMacOS26OrLater)
 
+                if settings.summarizationEnabled {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Summarization Instructions")
+                            .font(.headline)
+                        Text("Guide how memos are summarized (optional)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextEditor(text: Binding(
+                            get: { settings.summarizationInstructions ?? "" },
+                            set: { newValue in
+                                let enforced = enforceWordLimit(newValue, limit: 300)
+                                settings.summarizationInstructions = enforced.isEmpty ? nil : enforced
+                            }
+                        ))
+                        .frame(height: 80)
+                        .font(.body)
+                        Text("\(wordCount(settings.summarizationInstructions ?? "")) / 300 words")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Toggle("Enable Title Generation", isOn: $settings.titleGenerationEnabled)
                     .disabled(!isMacOS26OrLater)
 
@@ -82,7 +104,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 300)
+        .frame(width: 480, height: 420)
         .task {
             let routingModel = SettingsRoutingModel(notesService: notesService, settings: settings)
             model = routingModel
