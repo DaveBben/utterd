@@ -58,6 +58,8 @@ public final class NoteRoutingPipelineStage: Sendable {
         do {
             try await store.markProcessed(fileURL: fileURL, date: now)
         } catch {
+            // Note was created successfully; markProcessed failure means this record may be
+            // re-processed on restart, creating a duplicate note — accepted tradeoff (plan edge case 7)
             logger.error("NoteRoutingPipelineStage: failed to mark processed \(fileURL.lastPathComponent): \(error)")
         }
         return .success

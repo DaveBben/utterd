@@ -1,7 +1,8 @@
 import Foundation
 
 /// A persistent record representing a voice memo in the processing pipeline.
-/// Created when a new voice memo is detected; tracks whether the memo has been processed.
+/// Created when a new voice memo is detected; tracks the memo's lifecycle state:
+/// unprocessed, successfully processed, or permanently failed.
 public struct MemoRecord: Codable, Sendable, Equatable {
     public let fileURL: URL
     public let dateCreated: Date

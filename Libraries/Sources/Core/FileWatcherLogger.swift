@@ -5,11 +5,21 @@ public final class FileWatcherLogger: WatcherLogger, @unchecked Sendable {
     private let rotationThreshold: Int
     private let lock = NSLock()
     private var fileHandle: FileHandle?
+    private let dateFormatter: DateFormatter
 
     public init(fileURL: URL, rotationThreshold: Int = 10 * 1024 * 1024) {
         self.fileURL = fileURL
         self.rotationThreshold = rotationThreshold
         self.fileHandle = Self.openOrCreate(at: fileURL)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        self.dateFormatter = formatter
+    }
+
+    deinit {
+        lock.lock()
+        fileHandle?.closeFile()
+        lock.unlock()
     }
 
     private static func openOrCreate(at url: URL) -> FileHandle? {
@@ -47,9 +57,7 @@ public final class FileWatcherLogger: WatcherLogger, @unchecked Sendable {
     }
 
     private func formatLine(level: String, message: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let timestamp = formatter.string(from: Date())
+        let timestamp = dateFormatter.string(from: Date())
         return "[\(timestamp)] [\(level)] \(message)\n"
     }
 }

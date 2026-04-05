@@ -117,8 +117,10 @@ struct MemoConsumerTests {
         let event = VoiceMemoEvent(fileURL: memoURL, fileSize: 1000)
         await consumer.consume(makeStream(events: [event]))
 
-        // Yield to allow the callback Task to complete
-        await Task.yield()
+        for _ in 0..<50 {
+            if await receivedRecords.get().count >= 1 { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
 
         let received = await receivedRecords.get()
         #expect(received.count == 1)

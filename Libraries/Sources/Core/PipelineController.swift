@@ -36,6 +36,9 @@ public final class PipelineController {
     }
 
     public func start() async {
+        // Cancel any prior run to prevent orphaned tasks processing concurrently
+        stop()
+
         // 1. Create unbounded AsyncStream queue
         let (queue, queueContinuation) = AsyncStream<MemoRecord>.makeStream(
             bufferingPolicy: .unbounded
@@ -71,6 +74,7 @@ public final class PipelineController {
             logger: logger
         )
         let routingStage = makeRoutingStage?()
+        // Captured locally to avoid strong self-reference in Task closure
         let capturedStore = store
         let capturedOnItemProcessed = onItemProcessed
 
