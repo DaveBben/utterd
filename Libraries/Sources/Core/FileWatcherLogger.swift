@@ -43,10 +43,10 @@ public final class FileWatcherLogger: WatcherLogger, @unchecked Sendable {
     }
 
     private func write(level: String, message: String) {
-        let line = formatLine(level: level, message: message)
-        guard let data = line.data(using: .utf8) else { return }
         lock.lock()
         defer { lock.unlock() }
+        let line = formatLine(level: level, message: message)
+        guard let data = line.data(using: .utf8) else { return }
         guard let handle = fileHandle else { return }
         let currentSize = (try? handle.seekToEnd()) ?? 0
         if Int(currentSize) + data.count > rotationThreshold {

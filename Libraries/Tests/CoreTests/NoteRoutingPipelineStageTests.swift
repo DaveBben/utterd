@@ -269,8 +269,6 @@ struct NoteRoutingPipelineStageTests {
     @Test
     func cancellationReturnsCancelledResult() async throws {
         let notes = MockNotesService()
-        // Make createNote hang until cancelled — use a Never-resolving service
-        struct CancelledError: Error {}
         notes.createNoteError = CancellationError()
 
         let store = MockMemoStore()
