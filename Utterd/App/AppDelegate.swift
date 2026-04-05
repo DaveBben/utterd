@@ -75,13 +75,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let logger = OSLogWatcherLogger()
+        let osLogger = OSLogWatcherLogger()
         let directoryURL = voiceMemoDirectoryURL
 
-        guard let storeURL = storeFileURL(logger: logger) else {
-            logger.error("Pipeline not started — cannot create data directory")
+        guard let storeURL = storeFileURL(logger: osLogger) else {
+            osLogger.error("Pipeline not started — cannot create data directory")
             return
         }
+
+        let logURL = storeURL.deletingLastPathComponent().appendingPathComponent("utterd.log")
+        let fileLogger = FileWatcherLogger(fileURL: logURL)
+        let logger = CompositeWatcherLogger([osLogger, fileLogger])
+
         let store = JSONMemoStore(fileURL: storeURL, logger: logger)
 
         Task { [weak self] in
@@ -113,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makePipelineController(
         store: JSONMemoStore,
         watcher: VoiceMemoWatcher,
-        logger: OSLogWatcherLogger
+        logger: any WatcherLogger
     ) -> PipelineController {
         let transcriptionService = SpeechAnalyzerTranscriptionService()
         let notesService = AppleScriptNotesService()
@@ -126,11 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             transcriptionService: transcriptionService,
             watcherStream: watcher.events(),
             logger: logger,
-            makeRoutingStage: { [weak self] onComplete in
-                let wrappedOnComplete: @Sendable () async -> Void = {
-                    await MainActor.run { self?.appState?.lastProcessedDate = Date() }
-                    await onComplete()
-                }
+            makeRoutingStage: {
                 let configProvider: @Sendable () -> RoutingConfiguration = {
                     UserSettings.readRoutingConfiguration()
                 }
@@ -141,9 +142,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     store: store,
                     logger: logger,
                     configProvider: configProvider,
-                    contextBudget: contextBudget,
-                    onComplete: wrappedOnComplete
+                    contextBudget: contextBudget
                 )
+            },
+            onItemProcessed: { [weak self] in
+                await MainActor.run { self?.appState?.lastProcessedDate = Date() }
             }
         )
     }
