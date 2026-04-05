@@ -189,6 +189,136 @@ struct IterativeRefineSummarizerTests {
         }
     }
 
+    // MARK: - Instructions: system prompt content
+
+    @Test
+    func nilInstructionsUsesBasePrompt() async throws {
+        // Multi-chunk so we can assert on ALL calls
+        // total=1000, overhead=200, reserve=0.3 -> chunk=560; 1200 words = 3 chunks
+        let budget = makeBudget(totalWords: 1000, systemOverhead: 200, reserveRatio: 0.3)
+        let transcript = makeWords(1200)
+        let llm = SequenceMockLLMService(responses: ["s1", "s2", "s3"])
+        let summarizer = IterativeRefineSummarizer(llmService: llm)
+
+        _ = try await summarizer.summarize(transcript: transcript, contextBudget: budget, instructions: nil)
+
+        let basePrompt = "You are a concise summarizer. Return only the summary text."
+        for call in llm.calls {
+            #expect(call.systemPrompt == basePrompt)
+        }
+    }
+
+    @Test
+    func emptyInstructionsUsesBasePrompt() async throws {
+        let budget = makeBudget(totalWords: 1000, systemOverhead: 200, reserveRatio: 0.3)
+        let transcript = makeWords(1200)
+        let llm = SequenceMockLLMService(responses: ["s1", "s2", "s3"])
+        let summarizer = IterativeRefineSummarizer(llmService: llm)
+
+        _ = try await summarizer.summarize(transcript: transcript, contextBudget: budget, instructions: "")
+
+        let basePrompt = "You are a concise summarizer. Return only the summary text."
+        for call in llm.calls {
+            #expect(call.systemPrompt == basePrompt)
+        }
+    }
+
+    @Test
+    func whitespaceOnlyInstructionsUsesBasePrompt() async throws {
+        let budget = makeBudget(totalWords: 1000, systemOverhead: 200, reserveRatio: 0.3)
+        let transcript = makeWords(1200)
+        let llm = SequenceMockLLMService(responses: ["s1", "s2", "s3"])
+        let summarizer = IterativeRefineSummarizer(llmService: llm)
+
+        _ = try await summarizer.summarize(transcript: transcript, contextBudget: budget, instructions: "   \n  ")
+
+        let basePrompt = "You are a concise summarizer. Return only the summary text."
+        for call in llm.calls {
+            #expect(call.systemPrompt == basePrompt)
+        }
+    }
+
+    @Test
+    func instructionsWithLeadingTrailingWhitespaceAreTrimmed() async throws {
+        let budget = makeBudget(totalWords: 1000, systemOverhead: 200, reserveRatio: 0.3)
+        let transcript = makeWords(500)
+        let llm = SequenceMockLLMService(responses: ["summary"])
+        let summarizer = IterativeRefineSummarizer(llmService: llm)
+
+        _ = try await summarizer.summarize(transcript: transcript, contextBudget: budget, instructions: "  \nFocus on action items\n  ")
+
+        let expected = "You are a concise summarizer. Return only the summary text.\n\nFocus on action items"
+        #expect(llm.calls.count == 1)
+        #expect(llm.calls[0].systemPrompt == expected)
+    }
+
+    @Test
+    func instructionsAppearOnEveryChunkCall() async throws {
+        // total=1000, overhead=200, reserve=0.3 -> chunk=560; 1200 words = 3 chunks
+        let budget = makeBudget(totalWords: 1000, systemOverhead: 200, reserveRatio: 0.3)
+        let transcript = makeWords(1200)
+        let llm = SequenceMockLLMService(responses: ["s1", "s2", "s3"])
+        let summarizer = IterativeRefineSummarizer(llmService: llm)
+
+        _ = try await summarizer.summarize(transcript: transcript, contextBudget: budget, instructions: "Focus on action items")
+
+        let expected = "You are a concise summarizer. Return only the summary text.\n\nFocus on action items"
+        #expect(llm.calls.count == 3)
+        for call in llm.calls {
+            #expect(call.systemPrompt == expected)
+        }
+    }
+
+    // MARK: - Instructions: budget adjustment
+
+    @Test
+    func instructionsReduceChunkSizeAndForceMoreChunks() async throws {
+        // Without instructions: total=1000, overhead=200, reserve=0.3 -> availableForNewChunk=560
+        // A 500-word transcript fits in 1 chunk (500 <= 560)
+        let budget = LLMContextBudget(totalWords: 1000, systemPromptOverhead: 200, summaryReserveRatio: 0.3)
+        let transcript = makeWords(500)
+
+        // 200-word instructions: adjusted overhead = min(200+200, 999) = 400
+        // availableForContent = 600, availableForNewChunk = Int(600*0.7) = 420
+        // 500 words > 420 -> forces 2 chunks
+        let instructions = makeWords(200)
+
+        let llmWithout = SequenceMockLLMService(responses: ["summary"])
+        let summarizerWithout = IterativeRefineSummarizer(llmService: llmWithout)
+        _ = try await summarizerWithout.summarize(transcript: transcript, contextBudget: budget, instructions: nil)
+        #expect(llmWithout.calls.count == 1)
+
+        let llmWith = SequenceMockLLMService(responses: ["chunk1 summary", "chunk2 summary"])
+        let summarizerWith = IterativeRefineSummarizer(llmService: llmWith)
+        _ = try await summarizerWith.summarize(transcript: transcript, contextBudget: budget, instructions: instructions)
+        #expect(llmWith.calls.count == 2)
+    }
+
+    @Test
+    func budgetClampingPreventscrashWhenInstructionsExceedTotalWords() async throws {
+        // totalWords=210, systemOverhead=200, instructions=20 words
+        // Unclamped overhead = 200+20 = 220 which exceeds totalWords=210 -> would fatalError
+        // Clamped overhead = min(220, 210-1) = 209
+        // availableForContent = 210-209 = 1
+        // availableForNewChunk = max(1, Int(1*0.7)) = max(1,0) = 1 -> 1 word per chunk
+        let budget = LLMContextBudget(totalWords: 210, systemPromptOverhead: 200, summaryReserveRatio: 0.3)
+        let transcriptWords = 5
+        let transcript = makeWords(transcriptWords)
+        let instructions = makeWords(20)
+
+        // 5 words / 1 per chunk = 5 chunks
+        let llm = SequenceMockLLMService(responses: (1...transcriptWords).map { "s\($0)" })
+        let summarizer = IterativeRefineSummarizer(llmService: llm)
+
+        _ = try await summarizer.summarize(transcript: transcript, contextBudget: budget, instructions: instructions)
+
+        // Must have called LLM at least once (did not crash)
+        #expect(llm.calls.count >= 1)
+        // With availableForContent=1 and availableForNewChunk=1, each chunk is 1 word
+        // So 5 words -> 5 chunks
+        #expect(llm.calls.count == transcriptWords)
+    }
+
     // MARK: - Error propagation
 
     @Test
