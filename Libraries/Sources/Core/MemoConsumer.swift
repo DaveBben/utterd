@@ -10,15 +10,18 @@ public final class MemoConsumer {
     private let store: any MemoStore
     private let logger: any WatcherLogger
     private let now: @Sendable () -> Date
+    private let onRecordInserted: (@Sendable (MemoRecord) -> Void)?
 
     public init(
         store: any MemoStore,
         logger: any WatcherLogger,
-        now: @Sendable @escaping () -> Date = { Date() }
+        now: @Sendable @escaping () -> Date = { Date() },
+        onRecordInserted: (@Sendable (MemoRecord) -> Void)? = nil
     ) {
         self.store = store
         self.logger = logger
         self.now = now
+        self.onRecordInserted = onRecordInserted
     }
 
     /// Iterates the stream until it finishes, writing new memos to the store.
@@ -34,6 +37,7 @@ public final class MemoConsumer {
 
             do {
                 try await store.insert(record)
+                onRecordInserted?(record)
             } catch {
                 logger.error("Failed to insert memo record for \(event.fileURL.lastPathComponent): \(error)")
             }
