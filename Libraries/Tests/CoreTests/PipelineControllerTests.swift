@@ -361,7 +361,7 @@ struct PipelineControllerTests {
                     store: notesStore,
                     logger: logger,
                     configProvider: { RoutingConfiguration() },
-                    contextBudget: LLMContextBudget(totalWords: 100, systemPromptOverhead: 10, summaryReserveRatio: 0.3)
+                    contextBudget: try! LLMContextBudget(totalWords: 100, systemPromptOverhead: 10, summaryReserveRatio: 0.3)
                 )
             },
             onItemProcessed: {}

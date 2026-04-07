@@ -36,12 +36,17 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
 
         stop()
 
+        // 256 batches accommodates realistic iCloud sync bursts for a voice memo directory.
+        // .bufferingNewest keeps the most recent events (most likely to contain unprocessed memos)
+        // if the consumer falls behind during slow pipeline processing.
         let (stream, cont) = AsyncStream<Set<URL>>.makeStream(
-            bufferingPolicy: .bufferingOldest(16)
+            bufferingPolicy: .bufferingNewest(256)
         )
 
         let pathsToWatch = [directoryURL.path] as CFArray
         var context = FSEventStreamContext()
+        // Prevent self from being deallocated while the C callback holds a reference.
+        // Balanced by .release() in stopOnQueue() — must be called exactly once.
         let retained = Unmanaged.passRetained(self)
         let ptr = retained.toOpaque()
         context.info = ptr
@@ -100,6 +105,7 @@ public final class FSEventsDirectoryMonitor: DirectoryMonitor, @unchecked Sendab
         continuation = nil
 
         if let ptr = contextPointer {
+            // Balance the passRetained() from start(). Called exactly once due to isRunning guard.
             Unmanaged<FSEventsDirectoryMonitor>.fromOpaque(ptr).release()
             contextPointer = nil
         }

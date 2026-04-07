@@ -27,10 +27,11 @@ struct FileWatcherLoggerTests {
         #expect(contents.contains("gamma"))
     }
 
-    // AC-4.3: rotation truncates file when threshold is exceeded
-    @Test("rotation truncates file when threshold is exceeded and last line is present")
-    func rotationTruncatesAtThreshold() throws {
+    // AC-4.3: rotation creates .1 archive and starts fresh file
+    @Test("rotation creates archive and fresh file when threshold exceeded")
+    func rotationCreatesArchive() throws {
         let url = makeTempURL()
+        let rotatedURL = url.appendingPathExtension("1")
         let threshold = 1024
         let logger = FileWatcherLogger(fileURL: url, rotationThreshold: threshold)
 
@@ -43,12 +44,23 @@ struct FileWatcherLoggerTests {
         let contents = try String(contentsOf: url, encoding: .utf8)
         let fileSize = contents.utf8.count
 
-        // File must be under threshold + one extra line worth of bytes
+        // Main file should be small (only post-rotation writes)
         let oneLineMax = 200
         #expect(fileSize < threshold + oneLineMax)
 
-        // The last-written line must be present
+        // The last-written line must be present in the main file
         #expect(contents.contains("line-19"))
+
+        // Rotated archive should exist and contain earlier lines
+        let rotatedExists = FileManager.default.fileExists(atPath: rotatedURL.path)
+        #expect(rotatedExists, "Rotated .1 file should exist")
+        if rotatedExists {
+            let rotatedContents = try String(contentsOf: rotatedURL, encoding: .utf8)
+            #expect(rotatedContents.contains("line-0"))
+        }
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: rotatedURL)
     }
 
     // Graceful no-op when file cannot be created

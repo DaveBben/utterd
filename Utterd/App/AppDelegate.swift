@@ -63,7 +63,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Pipeline lifecycle
 
-    private static let defaultContextBudget = LLMContextBudget(
+    // swiftlint:disable:next force_try — hardcoded valid constants
+    private static let defaultContextBudget = try! LLMContextBudget(
         totalWords: 3000,
         systemPromptOverhead: 200,
         summaryReserveRatio: 0.3
@@ -76,42 +77,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let osLogger = OSLogWatcherLogger()
-        let directoryURL = voiceMemoDirectoryURL
-
-        guard let storeURL = storeFileURL(logger: osLogger) else {
+        guard let (logger, store) = makeLoggerAndStore(osLogger: osLogger) else {
             osLogger.error("Pipeline not started — cannot create data directory")
             return
         }
 
-        let logURL = storeURL.deletingLastPathComponent().appendingPathComponent("utterd.log")
-        let fileLogger = FileWatcherLogger(fileURL: logURL)
-        let logger = CompositeWatcherLogger([osLogger, fileLogger])
-
-        let store = JSONMemoStore(fileURL: storeURL, logger: logger)
-
         Task { [weak self] in
             let record = await store.mostRecentlyProcessed()
-            await MainActor.run {
-                self?.appState?.lastProcessedDate = record?.dateProcessed
-            }
+            await MainActor.run { self?.appState?.lastProcessedDate = record?.dateProcessed }
         }
 
-        let monitor = FSEventsDirectoryMonitor(directoryURL: directoryURL)
+        let monitor = FSEventsDirectoryMonitor(directoryURL: voiceMemoDirectoryURL)
         let watcher = VoiceMemoWatcher(
-            directoryURL: directoryURL,
-            monitor: monitor,
-            fileSystem: fileSystem,
-            logger: logger
+            directoryURL: voiceMemoDirectoryURL, monitor: monitor,
+            fileSystem: fileSystem, logger: logger
         )
         self.voiceMemoWatcher = watcher
 
-        let controller = makePipelineController(
-            store: store, watcher: watcher, logger: logger
-        )
+        let controller = makePipelineController(store: store, watcher: watcher, logger: logger)
         self.pipelineController = controller
 
         watcherTask = Task { await watcher.start() }
         controllerTask = Task { await controller.start() }
+    }
+
+    private func makeLoggerAndStore(osLogger: OSLogWatcherLogger) -> (any WatcherLogger, JSONMemoStore)? {
+        guard let storeURL = storeFileURL(logger: osLogger) else { return nil }
+        let logURL = storeURL.deletingLastPathComponent().appendingPathComponent("utterd.log")
+        let fileLogger = FileWatcherLogger(fileURL: logURL)
+        let logger = CompositeWatcherLogger([osLogger, fileLogger])
+        let store = JSONMemoStore(fileURL: storeURL, logger: logger)
+        return (logger, store)
     }
 
     @available(macOS 26, *)

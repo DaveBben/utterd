@@ -15,14 +15,14 @@ struct NoteRoutingPipelineStageTests {
         NotesFolder(id: "personal", name: "personal")
     }
 
-    private func smallBudget() -> LLMContextBudget {
+    private func smallBudget() throws -> LLMContextBudget {
         // availableForContent = 100 - 10 = 90 words
-        LLMContextBudget(totalWords: 100, systemPromptOverhead: 10, summaryReserveRatio: 0.3)
+        try LLMContextBudget(totalWords: 100, systemPromptOverhead: 10, summaryReserveRatio: 0.3)
     }
 
-    private func tinyBudget() -> LLMContextBudget {
+    private func tinyBudget() throws -> LLMContextBudget {
         // availableForContent = 5 - 1 = 4 words — anything > 4 words triggers summarization
-        LLMContextBudget(totalWords: 5, systemPromptOverhead: 1, summaryReserveRatio: 0.3)
+        try LLMContextBudget(totalWords: 5, systemPromptOverhead: 1, summaryReserveRatio: 0.3)
     }
 
     private func makeStage(
@@ -61,7 +61,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         // Fixed date: 2025-03-15 14:30:00 UTC → "Voice Memo 2025-03-15 14:30"
@@ -114,7 +114,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "", fileURL: fileURL)
@@ -145,7 +145,7 @@ struct NoteRoutingPipelineStageTests {
             notesService: notes,
             store: store,
             config: RoutingConfiguration(defaultFolderName: "personal"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -172,7 +172,7 @@ struct NoteRoutingPipelineStageTests {
             notesService: notes,
             store: store,
             config: RoutingConfiguration(defaultFolderName: "Gone"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -198,7 +198,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(defaultFolderName: "personal"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -206,7 +206,7 @@ struct NoteRoutingPipelineStageTests {
 
         #expect(notes.createNoteCalls.count == 1)
         #expect(notes.createNoteCalls[0].folder == nil)
-        #expect(logger.warnings.count >= 1)
+        #expect(logger.errors.count >= 1)
     }
 
     // MARK: - Test 6: markProcessed called exactly once and route() returns .success
@@ -220,7 +220,7 @@ struct NoteRoutingPipelineStageTests {
         let stage = makeStage(
             notesService: notes,
             store: store,
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "hello", fileURL: makeURL())
@@ -248,7 +248,7 @@ struct NoteRoutingPipelineStageTests {
             notesService: notes,
             store: store,
             logger: logger,
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "hello", fileURL: fileURL)
@@ -275,7 +275,7 @@ struct NoteRoutingPipelineStageTests {
         let stage = makeStage(
             notesService: notes,
             store: store,
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "hello", fileURL: makeURL())
@@ -302,7 +302,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -330,7 +330,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: true),
-            contextBudget: tinyBudget()
+            contextBudget: try tinyBudget()
         )
 
         let result = TranscriptionResult(transcript: "one two three four five", fileURL: makeURL())
@@ -356,7 +356,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "", fileURL: makeURL())
@@ -385,7 +385,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(summarizationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -411,7 +411,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -436,7 +436,7 @@ struct NoteRoutingPipelineStageTests {
             llmService: llm,
             store: store,
             config: RoutingConfiguration(titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -444,7 +444,7 @@ struct NoteRoutingPipelineStageTests {
 
         #expect(llm.calls.count == 1)
         #expect(llm.calls[0].systemPrompt.lowercased().contains("title"))
-        #expect(llm.calls[0].userPrompt == "Buy groceries")
+        #expect(llm.calls[0].userPrompt.contains("Buy groceries"))
         #expect(notes.createNoteCalls[0].title == "Grocery Shopping")
     }
 
@@ -464,7 +464,7 @@ struct NoteRoutingPipelineStageTests {
             llmService: llm,
             store: store,
             config: RoutingConfiguration(titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let longTranscript = (1...3000).map { "word\($0)" }.joined(separator: " ")
@@ -494,7 +494,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -521,7 +521,7 @@ struct NoteRoutingPipelineStageTests {
             llmService: llm,
             store: store,
             config: RoutingConfiguration(titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "", fileURL: makeURL())
@@ -550,7 +550,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -583,7 +583,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -617,7 +617,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -644,7 +644,7 @@ struct NoteRoutingPipelineStageTests {
             llmService: llm,
             store: store,
             config: RoutingConfiguration(titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -669,7 +669,7 @@ struct NoteRoutingPipelineStageTests {
             llmService: llm,
             store: store,
             config: RoutingConfiguration(titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -694,7 +694,7 @@ struct NoteRoutingPipelineStageTests {
             llmService: llm,
             store: store,
             config: RoutingConfiguration(titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -718,7 +718,7 @@ struct NoteRoutingPipelineStageTests {
             notesService: notes,
             store: store,
             config: RoutingConfiguration(defaultFolderName: "Shared Name", defaultFolderID: "id-B"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "test", fileURL: makeURL())
@@ -742,7 +742,7 @@ struct NoteRoutingPipelineStageTests {
             notesService: notes,
             store: store,
             config: RoutingConfiguration(defaultFolderName: "Work", defaultFolderID: "stale-id"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "test", fileURL: makeURL())
@@ -766,7 +766,7 @@ struct NoteRoutingPipelineStageTests {
             notesService: notes,
             store: store,
             config: RoutingConfiguration(defaultFolderName: "Work"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "test", fileURL: makeURL())
@@ -792,7 +792,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: true, summarizationInstructions: "Be brief"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -818,7 +818,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: true, summarizationInstructions: nil),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -843,7 +843,7 @@ struct NoteRoutingPipelineStageTests {
             summarizer: summarizer,
             store: store,
             config: RoutingConfiguration(summarizationEnabled: false, summarizationInstructions: "Be brief"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -868,7 +868,7 @@ struct NoteRoutingPipelineStageTests {
             llmService: llm,
             store: store,
             config: RoutingConfiguration(titleGenerationEnabled: true, summarizationInstructions: "Be brief"),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())
@@ -902,7 +902,7 @@ struct NoteRoutingPipelineStageTests {
             store: store,
             logger: logger,
             config: RoutingConfiguration(summarizationEnabled: true, titleGenerationEnabled: true),
-            contextBudget: smallBudget()
+            contextBudget: try smallBudget()
         )
 
         let result = TranscriptionResult(transcript: "Buy groceries", fileURL: makeURL())

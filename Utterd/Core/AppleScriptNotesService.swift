@@ -116,11 +116,11 @@ struct AppleScriptNotesService: NotesService {
                 _ = try await executeScript(script)
                 return .created
             } else {
-                try await createNoteInDefaultAccount(escapedTitle: escapedTitle, escapedBody: escapedBody)
+                try await createNoteInDefaultFolder(escapedTitle: escapedTitle, escapedBody: escapedBody)
                 return .createdInDefaultFolder(reason: "Folder no longer exists")
             }
         } else {
-            try await createNoteInDefaultAccount(escapedTitle: escapedTitle, escapedBody: escapedBody)
+            try await createNoteInDefaultFolder(escapedTitle: escapedTitle, escapedBody: escapedBody)
             return .created
         }
     }
@@ -140,14 +140,14 @@ struct AppleScriptNotesService: NotesService {
         return result.trimmingCharacters(in: .whitespacesAndNewlines) == "found"
     }
 
-    private func createNoteInDefaultAccount(escapedTitle: String, escapedBody: String) async throws {
-        // Target the folder named "Notes" in the default account. Every Apple Notes
-        // account has this folder, but it isn't necessarily the first one — folder
-        // ordering is alphabetical by display name.
+    private func createNoteInDefaultFolder(escapedTitle: String, escapedBody: String) async throws {
+        // Create in the default account without targeting a specific folder.
+        // Apple Notes places untargeted notes in the account's default folder
+        // automatically — avoids hardcoding a folder name that may not exist
+        // on iCloud-only, managed, or non-English locale accounts.
         let script = """
             tell application "Notes"
-                set targetFolder to folder "Notes" of default account
-                make new note at targetFolder with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
+                make new note at default account with properties {name:"\(escapedTitle)", body:"\(escapedBody)"}
             end tell
             """
         _ = try await executeScript(script)

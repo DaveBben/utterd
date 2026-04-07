@@ -47,13 +47,34 @@ public final class FileWatcherLogger: WatcherLogger, @unchecked Sendable {
         defer { lock.unlock() }
         let line = formatLine(level: level, message: message)
         guard let data = line.data(using: .utf8) else { return }
-        guard let handle = fileHandle else { return }
-        let currentSize = (try? handle.seekToEnd()) ?? 0
+        guard fileHandle != nil else { return }
+        let currentSize = (try? fileHandle?.seekToEnd()) ?? 0
         if Int(currentSize) + data.count > rotationThreshold {
-            try? handle.truncate(atOffset: 0)
-            try? handle.seek(toOffset: 0)
+            rotate()
         }
-        try? handle.write(contentsOf: data)
+        try? fileHandle?.write(contentsOf: data)
+    }
+
+    /// Rotates the current log file to `.1` and opens a fresh file.
+    /// Single generation — only the most recent rotated file is preserved.
+    /// Must be called while holding `lock`.
+    private func rotate() {
+        fileHandle?.closeFile()
+        fileHandle = nil
+
+        let fm = FileManager.default
+        let rotatedURL = fileURL.appendingPathExtension("1")
+        do {
+            // Remove old rotated file if it exists
+            try? fm.removeItem(at: rotatedURL)
+            try fm.moveItem(at: fileURL, to: rotatedURL)
+        } catch {
+            // Last-resort: if rename fails, truncate as fallback
+            fileHandle = Self.openOrCreate(at: fileURL)
+            return
+        }
+
+        fileHandle = Self.openOrCreate(at: fileURL)
     }
 
     private func formatLine(level: String, message: String) -> String {

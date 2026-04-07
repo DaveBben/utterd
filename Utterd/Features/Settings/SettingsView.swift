@@ -2,6 +2,7 @@ import Core
 import SwiftUI
 
 struct SettingsView: View {
+    // 300 words stays well within the 3000-word context budget after system prompt overhead (~200 words)
     private static let maxInstructionWords = 300
 
     @Environment(UserSettings.self) private var settings
@@ -80,10 +81,12 @@ struct SettingsView: View {
                         Text("Guide how memos are summarized (optional)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        // Hard-truncate at word limit on each keystroke.
+                        // The word counter below provides visual feedback.
                         TextEditor(text: Binding(
                             get: { settings.summarizationInstructions ?? "" },
                             set: { newValue in
-                                let enforced = enforceWordLimit(newValue, limit: Self.maxInstructionWords)
+                                let enforced = truncateToWordLimit(newValue, limit: Self.maxInstructionWords)
                                 settings.summarizationInstructions = enforced.isEmpty ? nil : enforced
                             }
                         ))

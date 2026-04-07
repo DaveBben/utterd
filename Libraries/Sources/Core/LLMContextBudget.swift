@@ -23,12 +23,22 @@ public struct LLMContextBudget: Sendable, Equatable {
         max(1, Int(Double(availableForContent) * (1 - summaryReserveRatio)))
     }
 
-    public init(totalWords: Int, systemPromptOverhead: Int, summaryReserveRatio: Double = 0.3) {
+    public enum BudgetError: Error, CustomStringConvertible {
+        case invalidConfiguration(String)
+
+        public var description: String {
+            switch self {
+            case .invalidConfiguration(let message): return message
+            }
+        }
+    }
+
+    public init(totalWords: Int, systemPromptOverhead: Int, summaryReserveRatio: Double = 0.3) throws {
         guard totalWords > systemPromptOverhead else {
-            fatalError("LLMContextBudget: totalWords (\(totalWords)) must exceed systemPromptOverhead (\(systemPromptOverhead))")
+            throw BudgetError.invalidConfiguration("totalWords (\(totalWords)) must exceed systemPromptOverhead (\(systemPromptOverhead))")
         }
         guard summaryReserveRatio >= 0, summaryReserveRatio < 1 else {
-            fatalError("LLMContextBudget: summaryReserveRatio (\(summaryReserveRatio)) must be in [0, 1)")
+            throw BudgetError.invalidConfiguration("summaryReserveRatio (\(summaryReserveRatio)) must be in [0, 1)")
         }
         self.totalWords = totalWords
         self.systemPromptOverhead = systemPromptOverhead

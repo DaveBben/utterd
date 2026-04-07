@@ -169,8 +169,8 @@ public final class VoiceMemoWatcher {
                 emittedPaths.insert(url)
                 broadcast(event)
                 logger.info("Detected \(url.lastPathComponent) (\(size) bytes)")
-            } else if url.pathExtension.lowercased() == "m4a" && !url.lastPathComponent.hasPrefix(".") && size <= 1024 {
-                logger.info("Skipped \(url.lastPathComponent) — \(size) bytes below 1024-byte threshold (likely iCloud stub)")
+            } else if let reason = VoiceMemoQualifier.rejectionReason(url: url, fileSize: size) {
+                logger.info("Skipped \(url.lastPathComponent) — \(reason)")
             }
         }
     }
