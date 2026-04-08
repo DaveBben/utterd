@@ -4,6 +4,7 @@ import Core
 enum PermissionGateAction {
     case proceed
     case showPermissionAlert
+    case showDirectoryMissingAlert
 }
 
 @MainActor
