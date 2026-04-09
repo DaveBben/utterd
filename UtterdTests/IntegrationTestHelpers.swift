@@ -1,12 +1,13 @@
-#if compiler(>=6.2)
-import Core
 import Foundation
 import Testing
-@testable import Utterd
 
 extension Tag {
     @Tag static var integration: Self
 }
+
+#if compiler(>=6.2)
+import Core
+@testable import Utterd
 
 /// Guards integration tests that require macOS 26+ and a downloaded Foundation Model.
 /// Skips the test on older macOS; records a diagnostic if the model is unavailable.
