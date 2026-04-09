@@ -1,3 +1,4 @@
+#if compiler(>=6.2)
 import Foundation
 import Testing
 import Core
@@ -58,3 +59,4 @@ private enum FixtureError: Error, CustomStringConvertible {
         }
     }
 }
+#endif

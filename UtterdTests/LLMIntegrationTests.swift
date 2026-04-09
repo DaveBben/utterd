@@ -1,3 +1,4 @@
+#if compiler(>=6.2)
 import Core
 import Foundation
 import Testing
@@ -120,3 +121,4 @@ struct LLMIntegrationTests {
         #expect(response.count < longText.count, "Summary should be shorter than original")
     }
 }
+#endif

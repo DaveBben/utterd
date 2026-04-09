@@ -1,3 +1,4 @@
+#if compiler(>=6.2)
 import Core
 import Foundation
 import Testing
@@ -22,3 +23,4 @@ func requireModelAccess() async throws {
         throw error
     }
 }
+#endif
