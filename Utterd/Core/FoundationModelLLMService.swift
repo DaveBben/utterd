@@ -1,5 +1,7 @@
 import Core
 import Foundation
+
+#if compiler(>=6.2)
 import FoundationModels
 
 /// On-device LLM provider using Apple's Foundation Model framework (macOS 26+).
@@ -15,3 +17,4 @@ struct FoundationModelLLMService: LLMService {
         return String(response.content)
     }
 }
+#endif

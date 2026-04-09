@@ -118,11 +118,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.voiceMemoWatcher = watcher
 
+        #if compiler(>=6.2)
         let controller = makePipelineController(store: store, watcher: watcher, logger: logger)
         self.pipelineController = controller
 
         watcherTask = Task { await watcher.start() }
         controllerTask = Task { await controller.start() }
+        #endif
     }
 
     private func makeLoggerAndStore(osLogger: OSLogWatcherLogger) -> (any WatcherLogger, JSONMemoStore)? {
@@ -134,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return (logger, store)
     }
 
+    #if compiler(>=6.2)
     @available(macOS 26, *)
     private func makePipelineController(
         store: JSONMemoStore,
@@ -170,6 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
     }
+    #endif
 
     private func stopPipeline() {
         voiceMemoWatcher?.stop()

@@ -1,5 +1,7 @@
 import Core
 import Foundation
+
+#if compiler(>=6.2)
 import Speech
 
 @available(macOS 26, *)
@@ -37,3 +39,4 @@ struct SpeechAnalyzerTranscriptionService: TranscriptionService {
 enum SpeechAnalyzerTranscriptionError: Error {
     case fileNotFound(URL)
 }
+#endif
