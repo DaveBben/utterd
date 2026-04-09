@@ -278,4 +278,4 @@ xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -20
 ### Leftover Issues
 
 - `showPermissionAlert` (existing FDA alert) is not testable via dependency injection — a TODO comment was added; refactor deferred to a follow-up
-- Manual launch-time verification on a fresh install (directory absent) still required — see AC1–AC5 manual checklist above
+- Manual launch-time verification on a fresh install (directory absent) — **verified 2026-04-08**
