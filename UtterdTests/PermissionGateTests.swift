@@ -11,6 +11,7 @@ struct PermissionGateTests {
     @MainActor
     func evaluateGateWhenAccessDenied() {
         let mock = MockFileSystemChecker()
+        mock.directoryExistsResult = true
         mock.readableResult = false
 
         let action = evaluatePermissionGate(fileSystem: mock)
@@ -22,6 +23,7 @@ struct PermissionGateTests {
     @MainActor
     func evaluateGateWhenAccessGranted() {
         let mock = MockFileSystemChecker()
+        mock.directoryExistsResult = true
         mock.readableResult = true
 
         let action = evaluatePermissionGate(fileSystem: mock)

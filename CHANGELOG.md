@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- "Voice Memos Not Set Up" alert at launch when the recordings directory is missing, with instructions to open Voice Memos and wait for iCloud sync before relaunching
+
 ## [1.0.0] - 2026-04-08
 
 ### Added

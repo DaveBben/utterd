@@ -61,15 +61,15 @@ the access attempt
 **AC1 — Directory absent, alert shown**
 GIVEN the Voice Memos recordings directory does not exist,
 WHEN the app finishes launching,
-THEN a "Setup Required" alert is shown (not the Full Disk Access alert) and the app does not start the pipeline.
+THEN a "Voice Memos Not Set Up" alert is shown (not the Full Disk Access alert) and the app does not start the pipeline.
 
 **AC2 — Alert content**
-GIVEN the "Setup Required" alert is displayed,
+GIVEN the "Voice Memos Not Set Up" alert is displayed,
 WHEN the user reads it,
 THEN the message text explains that Voice Memos has not synced yet and instructs them to open Voice Memos, wait for iCloud to sync, and relaunch the app.
 
 **AC3 — Alert dismissal quits the app**
-GIVEN the "Setup Required" alert is displayed,
+GIVEN the "Voice Memos Not Set Up" alert is displayed,
 WHEN the user clicks the only button ("Quit"),
 THEN the app terminates.
 
@@ -81,7 +81,7 @@ THEN the existing permission gate logic runs exactly as before (no behavioral ch
 **AC5 — Full Disk Access alert unchanged**
 GIVEN the directory exists but Full Disk Access has not been granted,
 WHEN the app finishes launching,
-THEN the existing Full Disk Access alert is shown (not the new "Setup Required" alert).
+THEN the existing Full Disk Access alert is shown (not the new "Voice Memos Not Set Up" alert).
 
 ---
 

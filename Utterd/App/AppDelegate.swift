@@ -32,6 +32,7 @@ func showDirectoryMissingAlert(
     alert.messageText = "Voice Memos Not Set Up"
     alert.informativeText = "Utterd couldn't find the Voice Memos recordings folder. Please open Voice Memos, wait for iCloud to sync, and then relaunch Utterd."
     alert.addButton(withTitle: "Quit")
+    // Single button — always terminate regardless of how the alert is dismissed.
     _ = showAlert(alert)
     terminate()
 }
