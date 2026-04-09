@@ -1,6 +1,6 @@
 # Plan: Voice Memo Directory Missing Alert
 
-**Status:** Approved
+**Status:** Complete
 **Created:** 2026-04-08
 
 ---
@@ -263,3 +263,19 @@ xcodebuild -scheme Utterd -destination 'platform=macOS' test 2>&1 | tail -20
 | AC4 — Directory present, existing flow unchanged | Task 1 |
 | AC5 — FDA alert unchanged | Task 1 |
 | Edge: directory is a file (not a dir) | Task 1 (`directoryExists` returns false) |
+
+---
+
+## Completion Summary
+
+**Completed:** 2026-04-08
+
+- Added `.showDirectoryMissingAlert` to `PermissionGateAction` and a `guard directoryExists` pre-check in `evaluatePermissionGate`; the existing FDA flow is untouched when the directory is present
+- Implemented `showDirectoryMissingAlert(showAlert:terminate:)` as a testable free function (injectable closures), matching the `handleOpenSystemSettings` pattern
+- Added 11 new tests covering all ACs and edge cases; total suite is 78 tests passing
+- Updated README setup steps, CHANGELOG `[Unreleased]`, and aligned mock naming across app and library test targets (2 code-review iterations)
+
+### Leftover Issues
+
+- `showPermissionAlert` (existing FDA alert) is not testable via dependency injection — a TODO comment was added; refactor deferred to a follow-up
+- Manual launch-time verification on a fresh install (directory absent) still required — see AC1–AC5 manual checklist above
