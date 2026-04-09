@@ -7,12 +7,18 @@ final class MockFileSystemChecker: FileSystemChecker, @unchecked Sendable {
     nonisolated(unsafe) var readableResult: Bool = true
     nonisolated(unsafe) var isReadableCalledWith: [URL] = []
 
+    nonisolated(unsafe) var directoryExistsResult: Bool = true
+    nonisolated(unsafe) var contentsOfDirectoryCallCount: Int = 0
+
     func isReadable(at url: URL) -> Bool {
         isReadableCalledWith.append(url)
         return readableResult
     }
 
-    func directoryExists(at url: URL) -> Bool { true }
-    func contentsOfDirectory(at url: URL) -> [URL] { [] }
+    func directoryExists(at url: URL) -> Bool { directoryExistsResult }
+    func contentsOfDirectory(at url: URL) -> [URL] {
+        contentsOfDirectoryCallCount += 1
+        return []
+    }
     func fileSize(at url: URL) -> Int64? { nil }
 }

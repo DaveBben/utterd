@@ -84,7 +84,7 @@ struct LLMIntegrationTests {
         let wordCount = transcript.split(separator: " ").count
         print("Transcript word count: \(wordCount)")
 
-        let budget = LLMContextBudget(totalWords: 3000, systemPromptOverhead: 200)
+        let budget = try LLMContextBudget(totalWords: 3000, systemPromptOverhead: 200, summaryReserveRatio: 0.3)
         let summary = try await summarizer.summarize(transcript: transcript, contextBudget: budget)
 
         print("Summary (\(summary.count) chars):\n\(summary)")

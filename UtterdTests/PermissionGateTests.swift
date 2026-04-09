@@ -60,4 +60,38 @@ struct PermissionGateTests {
             "Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings"
         ))
     }
+
+    @Test("evaluatePermissionGate returns showDirectoryMissingAlert when directory does not exist")
+    @MainActor
+    func evaluateGateWhenDirectoryMissing() {
+        let mock = MockFileSystemChecker()
+        mock.directoryExistsResult = false
+
+        let action = evaluatePermissionGate(fileSystem: mock)
+
+        #expect(action == .showDirectoryMissingAlert)
+    }
+
+    @Test("evaluatePermissionGate does not call contentsOfDirectory when directory does not exist")
+    @MainActor
+    func evaluateGateDoesNotListDirectoryWhenMissing() {
+        let mock = MockFileSystemChecker()
+        mock.directoryExistsResult = false
+
+        _ = evaluatePermissionGate(fileSystem: mock)
+
+        #expect(mock.contentsOfDirectoryCallCount == 0)
+    }
+
+    @Test("evaluatePermissionGate calls contentsOfDirectory when directory exists")
+    @MainActor
+    func evaluateGateListsDirectoryWhenPresent() {
+        let mock = MockFileSystemChecker()
+        mock.directoryExistsResult = true
+        mock.readableResult = true
+
+        _ = evaluatePermissionGate(fileSystem: mock)
+
+        #expect(mock.contentsOfDirectoryCallCount == 1)
+    }
 }

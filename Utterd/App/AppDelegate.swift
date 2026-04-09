@@ -10,6 +10,9 @@ enum PermissionGateAction {
 @MainActor
 func evaluatePermissionGate(fileSystem: FileSystemChecker) -> PermissionGateAction {
     let url = voiceMemoDirectoryURL
+    guard fileSystem.directoryExists(at: url) else {
+        return .showDirectoryMissingAlert
+    }
     // Attempt a directory listing to trigger TCC registration so Utterd
     // appears in System Settings > Full Disk Access.
     _ = fileSystem.contentsOfDirectory(at: url)
@@ -50,11 +53,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         assert(appState != nil, "appState must be wired by UtterdApp.body before applicationDidFinishLaunching")
 
         let action = evaluatePermissionGate(fileSystem: fileSystem)
-        if action == .proceed {
+        switch action {
+        case .proceed:
             appState?.permissionResolved = true
             startPipeline()
-        } else {
+        case .showPermissionAlert:
             showPermissionAlert()
+        case .showDirectoryMissingAlert:
+            showDirectoryMissingAlert()
         }
     }
 
@@ -173,6 +179,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Permission alert
+
+    private func showDirectoryMissingAlert() {
+        NSApplication.shared.terminate(nil)
+    }
 
     private func showPermissionAlert() {
         let alert = NSAlert()
