@@ -10,6 +10,8 @@ enum PermissionGateAction {
 @MainActor
 func evaluatePermissionGate(fileSystem: FileSystemChecker) -> PermissionGateAction {
     let url = voiceMemoDirectoryURL
+    // Assumption: fileExists returns true for TCC-protected directories;
+    // only contentsOfDirectory is blocked by the FDA gate.
     guard fileSystem.directoryExists(at: url) else {
         return .showDirectoryMissingAlert
     }
@@ -199,6 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Utterd.showDirectoryMissingAlert()
     }
 
+    // TODO: Refactor to injectable closures like showDirectoryMissingAlert for testability.
     private func showPermissionAlert() {
         let alert = NSAlert()
         alert.alertStyle = .warning

@@ -11,7 +11,7 @@ struct PermissionGateTests {
     @MainActor
     func evaluateGateWhenAccessDenied() {
         let mock = MockFileSystemChecker()
-        mock.directoryExistsResult = true
+        mock.existsResult = true
         mock.readableResult = false
 
         let action = evaluatePermissionGate(fileSystem: mock)
@@ -23,7 +23,7 @@ struct PermissionGateTests {
     @MainActor
     func evaluateGateWhenAccessGranted() {
         let mock = MockFileSystemChecker()
-        mock.directoryExistsResult = true
+        mock.existsResult = true
         mock.readableResult = true
 
         let action = evaluatePermissionGate(fileSystem: mock)
@@ -68,7 +68,7 @@ struct PermissionGateTests {
     @MainActor
     func evaluateGateWhenDirectoryMissing() {
         let mock = MockFileSystemChecker()
-        mock.directoryExistsResult = false
+        mock.existsResult = false
 
         let action = evaluatePermissionGate(fileSystem: mock)
 
@@ -79,7 +79,7 @@ struct PermissionGateTests {
     @MainActor
     func evaluateGateDoesNotListDirectoryWhenMissing() {
         let mock = MockFileSystemChecker()
-        mock.directoryExistsResult = false
+        mock.existsResult = false
 
         _ = evaluatePermissionGate(fileSystem: mock)
 
@@ -90,7 +90,7 @@ struct PermissionGateTests {
     @MainActor
     func evaluateGateListsDirectoryWhenPresent() {
         let mock = MockFileSystemChecker()
-        mock.directoryExistsResult = true
+        mock.existsResult = true
         mock.readableResult = true
 
         _ = evaluatePermissionGate(fileSystem: mock)
