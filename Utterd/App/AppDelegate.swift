@@ -23,6 +23,20 @@ let voiceMemoDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings")
 
 @MainActor
+func showDirectoryMissingAlert(
+    showAlert: (NSAlert) -> NSApplication.ModalResponse = { $0.runModal() },
+    terminate: () -> Void = { NSApplication.shared.terminate(nil) }
+) {
+    let alert = NSAlert()
+    alert.alertStyle = .informational
+    alert.messageText = "Voice Memos Not Set Up"
+    alert.informativeText = "Utterd couldn't find the Voice Memos recordings folder. Please open Voice Memos, wait for iCloud to sync, and then relaunch Utterd."
+    alert.addButton(withTitle: "Quit")
+    _ = showAlert(alert)
+    terminate()
+}
+
+@MainActor
 func handleOpenSystemSettings(
     openURL: (URL) -> Bool = { NSWorkspace.shared.open($0) },
     terminate: () -> Void = { NSApplication.shared.terminate(nil) }
@@ -181,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Permission alert
 
     private func showDirectoryMissingAlert() {
-        NSApplication.shared.terminate(nil)
+        Utterd.showDirectoryMissingAlert()
     }
 
     private func showPermissionAlert() {
