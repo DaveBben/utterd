@@ -4,11 +4,17 @@ import Core
 enum PermissionGateAction {
     case proceed
     case showPermissionAlert
+    case showDirectoryMissingAlert
 }
 
 @MainActor
 func evaluatePermissionGate(fileSystem: FileSystemChecker) -> PermissionGateAction {
     let url = voiceMemoDirectoryURL
+    // Assumption: fileExists returns true for TCC-protected directories;
+    // only contentsOfDirectory is blocked by the FDA gate.
+    guard fileSystem.directoryExists(at: url) else {
+        return .showDirectoryMissingAlert
+    }
     // Attempt a directory listing to trigger TCC registration so Utterd
     // appears in System Settings > Full Disk Access.
     _ = fileSystem.contentsOfDirectory(at: url)
@@ -17,6 +23,21 @@ func evaluatePermissionGate(fileSystem: FileSystemChecker) -> PermissionGateActi
 
 let voiceMemoDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings")
+
+@MainActor
+func showDirectoryMissingAlert(
+    showAlert: (NSAlert) -> NSApplication.ModalResponse = { $0.runModal() },
+    terminate: () -> Void = { NSApplication.shared.terminate(nil) }
+) {
+    let alert = NSAlert()
+    alert.alertStyle = .informational
+    alert.messageText = "Voice Memos Not Set Up"
+    alert.informativeText = "Utterd couldn't find the Voice Memos recordings folder. Please open Voice Memos, wait for iCloud to sync, and then relaunch Utterd."
+    alert.addButton(withTitle: "Quit")
+    // Single button — always terminate regardless of how the alert is dismissed.
+    _ = showAlert(alert)
+    terminate()
+}
 
 @MainActor
 func handleOpenSystemSettings(
@@ -49,11 +70,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         assert(appState != nil, "appState must be wired by UtterdApp.body before applicationDidFinishLaunching")
 
         let action = evaluatePermissionGate(fileSystem: fileSystem)
-        if action == .proceed {
+        switch action {
+        case .proceed:
             appState?.permissionResolved = true
             startPipeline()
-        } else {
+        case .showPermissionAlert:
             showPermissionAlert()
+        case .showDirectoryMissingAlert:
+            showDirectoryMissingAlert()
         }
     }
 
@@ -94,11 +118,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.voiceMemoWatcher = watcher
 
+        #if compiler(>=6.2)
         let controller = makePipelineController(store: store, watcher: watcher, logger: logger)
         self.pipelineController = controller
 
         watcherTask = Task { await watcher.start() }
         controllerTask = Task { await controller.start() }
+        #endif
     }
 
     private func makeLoggerAndStore(osLogger: OSLogWatcherLogger) -> (any WatcherLogger, JSONMemoStore)? {
@@ -110,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return (logger, store)
     }
 
+    #if compiler(>=6.2)
     @available(macOS 26, *)
     private func makePipelineController(
         store: JSONMemoStore,
@@ -146,6 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
     }
+    #endif
 
     private func stopPipeline() {
         voiceMemoWatcher?.stop()
@@ -173,6 +201,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Permission alert
 
+    private func showDirectoryMissingAlert() {
+        Utterd.showDirectoryMissingAlert()
+    }
+
+    // TODO: Refactor to injectable closures like showDirectoryMissingAlert for testability.
     private func showPermissionAlert() {
         let alert = NSAlert()
         alert.alertStyle = .warning

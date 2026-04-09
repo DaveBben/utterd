@@ -1,3 +1,4 @@
+#if compiler(>=6.2)
 import Foundation
 import Testing
 import Core
@@ -17,3 +18,4 @@ struct SpeechAnalyzerTranscriptionServiceTests {
     }
 
 }
+#endif

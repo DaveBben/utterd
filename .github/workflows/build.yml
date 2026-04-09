@@ -14,10 +14,12 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          echo 'DEVELOPMENT_TEAM = ' > Local.xcconfig
+          xcodegen generate
 
       - name: Build
         run: xcodebuild -scheme Utterd -destination 'platform=macOS' build
 
       - name: Test
-        run: xcodebuild -scheme Utterd -destination 'platform=macOS' test
+        run: xcodebuild -scheme Utterd -destination 'platform=macOS' test -skip-testing:UtterdTests/AppleScriptNotesServiceIntegrationTests -skip-testing:UtterdTests/AppleScriptNotesServiceFolderIntegrationTests

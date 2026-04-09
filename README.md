@@ -33,9 +33,10 @@ Download the latest release from the [GitHub Releases](https://github.com/DaveBb
 ## Setup
 
 1. Open the `.dmg` and drag Utterd to your Applications folder
-2. Launch Utterd, it appears as a menu bar icon
-3. Grant **Full Disk Access** when prompted (System Settings > Privacy & Security > Full Disk Access) — needed to read voice memos from iCloud
-4. Grant **Automation** permission when prompted — needed to create notes in Apple Notes (uses AppleScript)
+2. Open **Voice Memos** at least once so iCloud creates the recordings directory on this Mac
+3. Launch Utterd, it appears as a menu bar icon
+4. Grant **Full Disk Access** when prompted (System Settings > Privacy & Security > Full Disk Access) — needed to read voice memos from iCloud
+5. Grant **Automation** permission when prompted — needed to create notes in Apple Notes (uses AppleScript)
 
 ## Why is Full Disk Access Needed?
 Apple doesn't provide a public API for accessing voice memos. When iCloud sync is enabled, recordings are stored in `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/` on your Mac. Utterd only needs read access to that folder.
