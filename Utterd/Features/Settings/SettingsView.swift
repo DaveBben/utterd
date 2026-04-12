@@ -107,9 +107,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section("About") {
+                LabeledContent("Version") {
+                    Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")
+                        .foregroundStyle(.secondary)
+                }
+                Link("View Releases on GitHub", destination: URL(string: "https://github.com/DaveBben/utterd/releases")!)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 420)
+        .frame(width: 480, height: 520)
         .task {
             let routingModel = SettingsRoutingModel(notesService: notesService, settings: settings)
             model = routingModel
