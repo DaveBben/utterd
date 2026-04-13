@@ -98,6 +98,12 @@ guard let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locatio
 let startPoint = CGPoint(x: 0, y: CGFloat(height))      // top-left in CG coords
 let endPoint = CGPoint(x: CGFloat(width), y: 0)          // bottom-right in CG coords
 
+// Fill the canvas first so that any pixel not covered by the gradient
+// (e.g. anti-aliased edges) inherits the start color rather than being
+// left as transparent (alpha=0) in the premultiplied context.
+context.setFillColor(startColor)
+context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
 context.drawLinearGradient(
     gradient,
     start: startPoint,
