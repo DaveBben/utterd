@@ -133,6 +133,18 @@ rm -rf "$BUILD_DIR/dmg-staging"
 mkdir -p "$BUILD_DIR/dmg-staging"
 ditto "$APP_PATH" "$BUILD_DIR/dmg-staging/Utterd.app"
 
+# Create a Finder alias (not a symlink) to /Applications in the staging
+# directory. Aliases carry the target's icon inherently — the Applications
+# folder icon is embedded at creation time, so create-dmg's AppleScript does
+# not need to set it separately (which silently fails on newer macOS).
+osascript << APPLESCRIPT
+tell application "Finder"
+    set staging to (POSIX file "$BUILD_DIR/dmg-staging") as alias
+    set app_alias to make alias file at staging to (POSIX file "/Applications")
+    set name of app_alias to "Applications"
+end tell
+APPLESCRIPT
+
 echo "==> Creating DMG"
 create-dmg \
   --volname "Utterd" \
@@ -142,7 +154,7 @@ create-dmg \
   --icon-size 128 \
   --icon "Utterd.app" 150 200 \
   --hide-extension "Utterd.app" \
-  --app-drop-link 450 200 \
+  --icon "Applications" 450 200 \
   --no-internet-enable \
   --format UDZO \
   --hdiutil-quiet \

@@ -54,16 +54,18 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# AC2b: create-dmg invocation includes --app-drop-link flag
+# AC2b: Applications alias is staged via Finder alias (not --app-drop-link)
 # GIVEN the build script,
 # WHEN inspected,
-# THEN a create-dmg call with --app-drop-link is present.
+# THEN a Finder alias to /Applications is created via osascript before
+# create-dmg, and --icon "Applications" positions it (NOT --app-drop-link,
+# which silently fails to set the icon on newer macOS).
 # ---------------------------------------------------------------------------
 
-if grep -q -- '--app-drop-link' "$SCRIPT"; then
-    check "AC2b: create-dmg invocation includes --app-drop-link flag" "pass"
+if grep -q 'make alias file' "$SCRIPT" && grep -q '"Applications"' "$SCRIPT"; then
+    check "AC2b: Applications alias created via Finder osascript" "pass"
 else
-    check "AC2b: create-dmg invocation includes --app-drop-link flag" "fail"
+    check "AC2b: Applications alias created via Finder osascript" "fail"
 fi
 
 # ---------------------------------------------------------------------------

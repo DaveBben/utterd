@@ -55,7 +55,12 @@ guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
     exit(1)
 }
 
-let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
+// premultipliedLast: alpha is stored in the last channel and pre-multiplied.
+// This ensures the PNG written by CIContext has alpha=255 (fully opaque)
+// everywhere. noneSkipLast (the previous setting) caused CIFormat.RGBX8 to
+// write the X byte as 0, producing a transparent PNG that Finder rendered as
+// the default window background instead of the dark gradient.
+let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
 guard let context = CGContext(
     data: nil,
     width: width,
@@ -116,7 +121,7 @@ let ciContext = CIContext(options: [.useSoftwareRenderer: true])
 
 guard let pngData = ciContext.pngRepresentation(
     of: ciImage,
-    format: .RGBX8,   // matches opaque CGContext (noneSkipLast) — no alpha channel
+    format: .RGBA8,
     colorSpace: colorSpace
 ) else {
     fputs("Error: could not render PNG data\n", stderr)
