@@ -53,7 +53,9 @@ if [ -f "$OUTPUT_IMAGE" ]; then
 fi
 
 if [ -f "$SWIFT_SCRIPT" ]; then
-    if swift "$SWIFT_SCRIPT" > /dev/null 2>&1; then
+    # Pass explicit output path so the test definitively probes the same file
+    # the script wrote — independent of the script's default-path resolution.
+    if swift "$SWIFT_SCRIPT" "$OUTPUT_IMAGE" > /dev/null 2>&1; then
         if [ -f "$OUTPUT_IMAGE" ]; then
             check "AC2: running the script produces scripts/dmg-background.png" "pass"
         else

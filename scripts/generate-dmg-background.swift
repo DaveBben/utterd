@@ -109,11 +109,13 @@ guard let cgImage = context.makeImage() else {
 }
 
 let ciImage = CIImage(cgImage: cgImage)
-let ciContext = CIContext()
+// Software renderer avoids GPU/Metal init overhead for a one-shot offline
+// script and prevents macOS from triggering GPU privacy prompts.
+let ciContext = CIContext(options: [.useSoftwareRenderer: true])
 
 guard let pngData = ciContext.pngRepresentation(
     of: ciImage,
-    format: .RGBA8,
+    format: .RGBX8,   // matches opaque CGContext (noneSkipLast) — no alpha channel
     colorSpace: colorSpace
 ) else {
     fputs("Error: could not render PNG data\n", stderr)
