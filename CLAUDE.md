@@ -34,6 +34,9 @@ It monitors the iCloud Voice Memos sync directory, transcribes audio on-device
 - `swiftlint lint --strict` — lint (requires SwiftLint installed)
 - `swift-format format -i -r Utterd/ UtterdTests/ Libraries/` — format (requires swift-format installed)
 
+## Critical Reminders
+- Changelog.md should be updated as the codebase changes
+
 ## Critical Constraints
 - Never run swift test while another instance is running. Wait for background processes to complete before retrying.
 - Never run `swift build` or `swift test` in background or in parallel — SwiftPM holds an exclusive lock on `.build/`.
