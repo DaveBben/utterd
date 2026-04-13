@@ -6,6 +6,7 @@ set -euo pipefail
 # Prerequisites:
 #   - Xcode 26+ with Developer ID signing configured
 #   - XcodeGen installed (brew install xcodegen)
+#   - create-dmg installed (brew install create-dmg)
 #   - Notarization credentials stored in Keychain:
 #     xcrun notarytool store-credentials "Utterd-Notarize" \
 #       --apple-id "your@email.com" \
@@ -105,15 +106,38 @@ xcrun notarytool submit "$APP_ZIP" \
 echo "==> Stapling notarization ticket"
 xcrun stapler staple "$APP_PATH"
 
+echo "==> Staging app for DMG"
+rm -rf "$BUILD_DIR/dmg-staging"
+mkdir -p "$BUILD_DIR/dmg-staging"
+ditto "$APP_PATH" "$BUILD_DIR/dmg-staging/Utterd.app"
+
 echo "==> Creating DMG"
-hdiutil create \
-  -volname "Utterd" \
-  -srcfolder "$APP_PATH" \
-  -ov \
-  -format UDZO \
-  "$DMG_PATH"
+create-dmg \
+  --volname "Utterd" \
+  --background "$SCRIPT_DIR/dmg-background.png" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 128 \
+  --icon "Utterd.app" 150 200 \
+  --hide-extension "Utterd.app" \
+  --app-drop-link 450 200 \
+  --no-internet-enable \
+  --format UDZO \
+  --hdiutil-quiet \
+  "$DMG_PATH" \
+  "$BUILD_DIR/dmg-staging"
+
+rm -rf "$BUILD_DIR/dmg-staging"
 
 rm -f "$APP_ZIP"
+
+echo "==> Notarizing DMG"
+xcrun notarytool submit "$DMG_PATH" \
+  --keychain-profile "Utterd-Notarize" \
+  --wait
+
+echo "==> Stapling notarization ticket to DMG"
+xcrun stapler staple "$DMG_PATH"
 
 echo ""
 echo "==> Done!"
