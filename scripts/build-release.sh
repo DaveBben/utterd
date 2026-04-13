@@ -16,6 +16,12 @@ set -euo pipefail
 # Usage:
 #   ./scripts/build-release.sh 1.0.0
 
+# Verify create-dmg is installed
+if ! command -v create-dmg >/dev/null 2>&1; then
+  echo "Error: create-dmg not installed. Run: brew install create-dmg"
+  exit 1
+fi
+
 # Read DEVELOPMENT_TEAM from Local.xcconfig
 XCCONFIG="$(cd "$(dirname "$0")/.." && pwd)/Local.xcconfig"
 if [[ ! -f "$XCCONFIG" ]]; then
@@ -96,6 +102,9 @@ fi
 
 echo "==> Zipping app for notarization"
 APP_ZIP="$BUILD_DIR/Utterd.zip"
+# Register cleanup trap here, once APP_ZIP is defined. Fires on any exit
+# (success or failure) so artifacts are cleaned up even if create-dmg fails.
+trap 'rm -rf "$BUILD_DIR/dmg-staging"; rm -f "$APP_ZIP"' EXIT
 ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
 
 echo "==> Notarizing"
@@ -105,6 +114,12 @@ xcrun notarytool submit "$APP_ZIP" \
 
 echo "==> Stapling notarization ticket"
 xcrun stapler staple "$APP_PATH"
+
+if [[ ! -f "$SCRIPT_DIR/dmg-background.png" ]]; then
+  echo "Error: DMG background image not found at $SCRIPT_DIR/dmg-background.png"
+  echo "Regenerate it with: swift scripts/generate-dmg-background.swift"
+  exit 1
+fi
 
 echo "==> Staging app for DMG"
 rm -rf "$BUILD_DIR/dmg-staging"

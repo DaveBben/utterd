@@ -2,10 +2,11 @@
 # Task 2 — Replace hdiutil with create-dmg and add DMG notarization
 # RED phase: asserts the NEW state that does not yet exist.
 # All tests should FAIL before the implementation runs.
-# set -euo pipefail is intentional. All outcome checks are wrapped in if/else
-# guards so the exit-on-error behaviour is safe here. Any future additions to
-# this script MUST follow the same guard pattern — bare subcommands that can
-# return non-zero will abort the script before the summary prints.
+# set -euo pipefail is intentional. Rules for adding new checks:
+#   - grep/test inside `if` conditions: safe (set -e does not apply)
+#   - grep result captured in a variable: MUST use `|| true` to prevent abort
+#     e.g.: count=$(grep -c 'pattern' file || true)
+# Any future additions that break this pattern will abort before the summary.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
