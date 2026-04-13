@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - "Voice Memos Not Set Up" alert at launch when the recordings directory is missing, with instructions to open Voice Memos and wait for iCloud sync before relaunching
+- Version display and GitHub releases link in the Settings window
+- Styled DMG installer with dark gradient background, app icon at left, and Applications folder alias at right
+- App icon asset catalog (`Utterd/Resources/Assets.xcassets`) integrated via XcodeGen
+- `scripts/generate-dmg-background.swift`: CoreGraphics script that generates the 1200×800 DMG background image
+- DMG-level notarization and stapling in the release build script
+- `create-dmg` prerequisite documented in `docs/releasing.md`
 
 ## [1.0.0] - 2026-04-08
 
