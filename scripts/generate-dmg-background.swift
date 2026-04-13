@@ -3,6 +3,7 @@
 // Renders a 1200x800 dark diagonal gradient PNG for use as a DMG background.
 // Usage: swift generate-dmg-background.swift [output-path]
 // Default output: scripts/dmg-background.png (relative to this script's directory)
+// Note: invoke with an absolute or relative path only — tilde (~) is not expanded.
 
 import CoreGraphics
 import CoreImage

@@ -16,9 +16,23 @@ set -euo pipefail
 # Usage:
 #   ./scripts/build-release.sh 1.0.0
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# ---------------------------------------------------------------------------
+# Pre-flight checks — run everything before touching build artifacts or Apple
+# notarization to keep failures cheap and fast.
+# ---------------------------------------------------------------------------
+
 # Verify create-dmg is installed
 if ! command -v create-dmg >/dev/null 2>&1; then
   echo "Error: create-dmg not installed. Run: brew install create-dmg"
+  exit 1
+fi
+
+# Verify DMG background image exists before any build work
+if [[ ! -f "$SCRIPT_DIR/dmg-background.png" ]]; then
+  echo "Error: DMG background image not found at $SCRIPT_DIR/dmg-background.png"
+  echo "Regenerate it with: swift scripts/generate-dmg-background.swift"
   exit 1
 fi
 
@@ -59,7 +73,6 @@ if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
   exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
 ARCHIVE_PATH="$BUILD_DIR/Utterd.xcarchive"
@@ -115,12 +128,6 @@ xcrun notarytool submit "$APP_ZIP" \
 echo "==> Stapling notarization ticket"
 xcrun stapler staple "$APP_PATH"
 
-if [[ ! -f "$SCRIPT_DIR/dmg-background.png" ]]; then
-  echo "Error: DMG background image not found at $SCRIPT_DIR/dmg-background.png"
-  echo "Regenerate it with: swift scripts/generate-dmg-background.swift"
-  exit 1
-fi
-
 echo "==> Staging app for DMG"
 rm -rf "$BUILD_DIR/dmg-staging"
 mkdir -p "$BUILD_DIR/dmg-staging"
@@ -144,7 +151,10 @@ create-dmg \
 
 rm -rf "$BUILD_DIR/dmg-staging"
 
-rm -f "$APP_ZIP"
+if [[ ! -f "$DMG_PATH" ]]; then
+  echo "Error: DMG was not created at $DMG_PATH"
+  exit 1
+fi
 
 echo "==> Notarizing DMG"
 xcrun notarytool submit "$DMG_PATH" \
