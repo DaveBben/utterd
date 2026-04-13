@@ -29,6 +29,15 @@ if ! command -v create-dmg >/dev/null 2>&1; then
   exit 1
 fi
 
+# Verify Finder automation permission — required for create-dmg to set the
+# Applications symlink icon inside the mounted DMG. If this fails, grant access:
+#   System Settings > Privacy & Security > Automation → enable Finder for Terminal
+if ! osascript -e 'tell application "Finder" to return 0' >/dev/null 2>&1; then
+  echo "Error: Finder automation is not permitted for this process."
+  echo "Grant Finder access to Terminal in: System Settings > Privacy & Security > Automation"
+  exit 1
+fi
+
 # Verify DMG background image exists before any build work
 if [[ ! -f "$SCRIPT_DIR/dmg-background.png" ]]; then
   echo "Error: DMG background image not found at $SCRIPT_DIR/dmg-background.png"
@@ -133,21 +142,12 @@ rm -rf "$BUILD_DIR/dmg-staging"
 mkdir -p "$BUILD_DIR/dmg-staging"
 ditto "$APP_PATH" "$BUILD_DIR/dmg-staging/Utterd.app"
 
-echo "==> Creating Applications alias for DMG"
-# Create a Finder alias (not a symlink) to /Applications in the staging
-# directory. Aliases carry the target's icon inherently — the Applications
-# folder icon is embedded at creation time, so create-dmg's AppleScript does
-# not need to set it separately (which silently fails on newer macOS).
-# Note: heredoc delimiter is intentionally unquoted so $BUILD_DIR expands.
-osascript << APPLESCRIPT || { echo "Error: failed to create Applications alias — is Finder running?"; exit 1; }
-tell application "Finder"
-    set staging to (POSIX file "$BUILD_DIR/dmg-staging") as alias
-    set app_alias to make alias file at staging to (POSIX file "/Applications")
-    set name of app_alias to "Applications"
-end tell
-APPLESCRIPT
-
 echo "==> Creating DMG"
+# --app-drop-link creates a symlink to /Applications and uses AppleScript
+# (while the DMG is mounted) to set its icon. Setting the icon on the mounted
+# image is more reliable than pre-staging a Finder alias, because hdiutil does
+# not consistently preserve alias resource fork data through packaging.
+# The Finder automation pre-flight check above ensures this step will succeed.
 create-dmg \
   --volname "Utterd" \
   --background "$SCRIPT_DIR/dmg-background.png" \
@@ -156,7 +156,7 @@ create-dmg \
   --icon-size 128 \
   --icon "Utterd.app" 150 200 \
   --hide-extension "Utterd.app" \
-  --icon "Applications" 450 200 \
+  --app-drop-link 450 200 \
   --no-internet-enable \
   --format UDZO \
   --hdiutil-quiet \

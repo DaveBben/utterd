@@ -54,18 +54,27 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# AC2b: Applications alias is staged via Finder alias (not --app-drop-link)
+# AC2b: Applications drop target uses --app-drop-link
 # GIVEN the build script,
 # WHEN inspected,
-# THEN a Finder alias to /Applications is created via osascript before
-# create-dmg, and --icon "Applications" positions it (NOT --app-drop-link,
-# which silently fails to set the icon on newer macOS).
+# THEN create-dmg is invoked with --app-drop-link to create the Applications
+# symlink and set its icon inside the mounted DMG via Finder AppleScript.
+# This is more reliable than pre-staging a Finder alias, because hdiutil does
+# not consistently preserve alias resource fork data through packaging.
+# A Finder automation pre-flight check must also be present to catch missing
+# Automation permission before any expensive build steps run.
 # ---------------------------------------------------------------------------
 
-if grep -q 'make alias file' "$SCRIPT" && grep -q '"Applications"' "$SCRIPT"; then
-    check "AC2b: Applications alias created via Finder osascript" "pass"
+if grep -q -- '--app-drop-link' "$SCRIPT"; then
+    check "AC2b: Applications drop target uses --app-drop-link" "pass"
 else
-    check "AC2b: Applications alias created via Finder osascript" "fail"
+    check "AC2b: Applications drop target uses --app-drop-link" "fail"
+fi
+
+if grep -q 'Finder automation' "$SCRIPT" || grep -q 'Automation.*Finder\|Finder.*Automation' "$SCRIPT"; then
+    check "AC2b: Finder automation pre-flight check present" "pass"
+else
+    check "AC2b: Finder automation pre-flight check present" "fail"
 fi
 
 # ---------------------------------------------------------------------------
