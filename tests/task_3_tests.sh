@@ -46,7 +46,7 @@ fi
 # THEN there is a link to github.com/create-dmg (the project's GitHub org/repo).
 # ---------------------------------------------------------------------------
 
-if grep -q 'github\.com/create-dmg' "$DOCS"; then
+if grep -q 'github\.com/create-dmg/create-dmg' "$DOCS"; then
     check "AC2: GitHub link github.com/create-dmg present" "pass"
 else
     check "AC2: GitHub link github.com/create-dmg present" "fail"
