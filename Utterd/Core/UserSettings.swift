@@ -12,6 +12,7 @@ final class UserSettings {
         static let summarizationEnabled = "summarizationEnabled"
         static let titleGenerationEnabled = "titleGenerationEnabled"
         static let summarizationInstructions = "summarizationInstructions"
+        static let launchAtLogin = "launchAtLogin"
         static let migrationVersion = "migrationVersion"
         // Legacy keys removed during migration v1
         static let useCustomPrompt = "useCustomPrompt"
@@ -65,6 +66,18 @@ final class UserSettings {
         set {
             withMutation(keyPath: \.summarizationInstructions) {
                 defaults.set(newValue, forKey: Keys.summarizationInstructions)
+            }
+        }
+    }
+
+    var launchAtLogin: Bool {
+        get {
+            access(keyPath: \.launchAtLogin)
+            return defaults.bool(forKey: Keys.launchAtLogin)
+        }
+        set {
+            withMutation(keyPath: \.launchAtLogin) {
+                defaults.set(newValue, forKey: Keys.launchAtLogin)
             }
         }
     }
