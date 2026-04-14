@@ -113,6 +113,8 @@ struct SettingsView: View {
             Section("System") {
                 Toggle("Launch at Login", isOn: $settings.launchAtLogin)
                     .onChange(of: settings.launchAtLogin) { _, newValue in
+                        let currentlyEnabled = SMAppService.mainApp.status == .enabled
+                        guard newValue != currentlyEnabled else { return }
                         do {
                             if newValue {
                                 try SMAppService.mainApp.register()
@@ -120,7 +122,7 @@ struct SettingsView: View {
                                 try SMAppService.mainApp.unregister()
                             }
                         } catch {
-                            settings.launchAtLogin = SMAppService.mainApp.status == .enabled
+                            settings.launchAtLogin = currentlyEnabled
                         }
                     }
             }
