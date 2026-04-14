@@ -219,4 +219,50 @@ struct TranscriptionPipelineStageTests {
         // If transcribeCalls is empty the copy itself failed — temp file was never created,
         // which is also an acceptable clean state.
     }
+
+    // MARK: - Temp file preserves source extension (.qta)
+
+    @Test func tempFilePreservesQTAExtension() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fileURL = try makeRealFile(in: dir, name: "test.qta")
+        let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
+
+        let service = MockTranscriptionService()
+        service.result = TranscriptionResult(transcript: "QTA memo", fileURL: fileURL)
+
+        let stage = TranscriptionPipelineStage(
+            transcriptionService: service,
+            logger: MockWatcherLogger()
+        )
+
+        _ = await stage.process(record)
+
+        #expect(service.transcribeCalls.count == 1)
+        #expect(service.transcribeCalls[0].pathExtension == "qta")
+    }
+
+    // MARK: - Temp file preserves source extension (.m4a)
+
+    @Test func tempFilePreservesM4AExtension() async throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fileURL = try makeRealFile(in: dir, name: "test.m4a")
+        let record = MemoRecord(fileURL: fileURL, dateCreated: Date())
+
+        let service = MockTranscriptionService()
+        service.result = TranscriptionResult(transcript: "M4A memo", fileURL: fileURL)
+
+        let stage = TranscriptionPipelineStage(
+            transcriptionService: service,
+            logger: MockWatcherLogger()
+        )
+
+        _ = await stage.process(record)
+
+        #expect(service.transcribeCalls.count == 1)
+        #expect(service.transcribeCalls[0].pathExtension == "m4a")
+    }
 }
