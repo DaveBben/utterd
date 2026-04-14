@@ -1,5 +1,6 @@
 import AppKit
 import Core
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -109,6 +110,21 @@ struct SettingsView: View {
                 }
             }
 
+            Section("System") {
+                Toggle("Launch at Login", isOn: $settings.launchAtLogin)
+                    .onChange(of: settings.launchAtLogin) { _, newValue in
+                        do {
+                            if newValue {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
+                            }
+                        } catch {
+                            settings.launchAtLogin = SMAppService.mainApp.status == .enabled
+                        }
+                    }
+            }
+
             Section("About") {
                 LabeledContent("Version") {
                     Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")
@@ -127,6 +143,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            settings.launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
         .frame(width: 480, height: 520)
         .task {
             let routingModel = SettingsRoutingModel(notesService: notesService, settings: settings)
