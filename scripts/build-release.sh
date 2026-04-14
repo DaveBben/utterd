@@ -6,6 +6,7 @@ set -euo pipefail
 # Prerequisites:
 #   - Xcode 26+ with Developer ID signing configured
 #   - XcodeGen installed (brew install xcodegen)
+#   - create-dmg installed (brew install create-dmg)
 #   - Notarization credentials stored in Keychain:
 #     xcrun notarytool store-credentials "Utterd-Notarize" \
 #       --apple-id "your@email.com" \
@@ -14,6 +15,28 @@ set -euo pipefail
 #
 # Usage:
 #   ./scripts/build-release.sh 1.0.0
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# ---------------------------------------------------------------------------
+# Pre-flight checks — run everything before touching build artifacts or Apple
+# notarization to keep failures cheap and fast.
+# ---------------------------------------------------------------------------
+
+# Verify create-dmg is installed
+if ! command -v create-dmg >/dev/null 2>&1; then
+  echo "Error: create-dmg not installed. Run: brew install create-dmg"
+  exit 1
+fi
+
+# Verify Finder automation permission — required for creating the Applications
+# alias in the staging directory and for create-dmg's AppleScript window styling.
+#   System Settings > Privacy & Security > Automation → enable Finder for Terminal
+if ! osascript -e 'tell application "Finder" to return 0' >/dev/null 2>&1; then
+  echo "Error: Finder automation is not permitted for this process."
+  echo "Grant Finder access to Terminal in: System Settings > Privacy & Security > Automation"
+  exit 1
+fi
 
 # Read DEVELOPMENT_TEAM from Local.xcconfig
 XCCONFIG="$(cd "$(dirname "$0")/.." && pwd)/Local.xcconfig"
@@ -52,7 +75,6 @@ if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
   exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
 ARCHIVE_PATH="$BUILD_DIR/Utterd.xcarchive"
@@ -95,6 +117,9 @@ fi
 
 echo "==> Zipping app for notarization"
 APP_ZIP="$BUILD_DIR/Utterd.zip"
+# Register cleanup trap here, once APP_ZIP is defined. Fires on any exit
+# (success or failure) so artifacts are cleaned up even if create-dmg fails.
+trap 'rm -rf "$BUILD_DIR/dmg-staging"; rm -f "$APP_ZIP"' EXIT
 ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
 
 echo "==> Notarizing"
@@ -105,15 +130,55 @@ xcrun notarytool submit "$APP_ZIP" \
 echo "==> Stapling notarization ticket"
 xcrun stapler staple "$APP_PATH"
 
-echo "==> Creating DMG"
-hdiutil create \
-  -volname "Utterd" \
-  -srcfolder "$APP_PATH" \
-  -ov \
-  -format UDZO \
-  "$DMG_PATH"
+echo "==> Staging app for DMG"
+rm -rf "$BUILD_DIR/dmg-staging"
+mkdir -p "$BUILD_DIR/dmg-staging"
+ditto "$APP_PATH" "$BUILD_DIR/dmg-staging/Utterd.app"
 
-rm -f "$APP_ZIP"
+echo "==> Creating Applications alias"
+# A Finder alias (not a symlink) preserves the Applications folder icon
+# metadata, which ensures the folder icon displays correctly on macOS 26+.
+# hdiutil create -srcfolder on HFS+ (the default) preserves resource forks.
+osascript <<APPLESCRIPT
+tell application "Finder"
+    set stagingFolder to (POSIX file "$BUILD_DIR/dmg-staging") as alias
+    set appAlias to make alias file at stagingFolder to (POSIX file "/Applications")
+    set name of appAlias to "Applications"
+end tell
+APPLESCRIPT
+
+echo "==> Creating DMG"
+# No --background image: Finder respects system appearance without one,
+# so dark-mode users see white text on a dark background automatically.
+# A custom background image forces Finder to always render black text.
+create-dmg \
+  --volname "Utterd" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 128 \
+  --icon "Utterd.app" 150 200 \
+  --hide-extension "Utterd.app" \
+  --icon "Applications" 450 200 \
+  --no-internet-enable \
+  --format UDZO \
+  --hdiutil-quiet \
+  "$DMG_PATH" \
+  "$BUILD_DIR/dmg-staging"
+
+rm -rf "$BUILD_DIR/dmg-staging"
+
+if [[ ! -f "$DMG_PATH" ]]; then
+  echo "Error: DMG was not created at $DMG_PATH"
+  exit 1
+fi
+
+echo "==> Notarizing DMG"
+xcrun notarytool submit "$DMG_PATH" \
+  --keychain-profile "Utterd-Notarize" \
+  --wait
+
+echo "==> Stapling notarization ticket to DMG"
+xcrun stapler staple "$DMG_PATH"
 
 echo ""
 echo "==> Done!"

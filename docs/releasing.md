@@ -13,6 +13,7 @@ Step-by-step guide for publishing a new Utterd release.
     --password "app-specific-password"
   ```
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) installed
+- [create-dmg](https://github.com/create-dmg/create-dmg): `brew install create-dmg`
 - [GitHub CLI](https://cli.github.com/) installed (`brew install gh`)
 
 ## Steps
@@ -76,7 +77,7 @@ The script will:
 
 ```bash
 git tag vX.Y.Z
-git push origin v X.Y.Z
+git push origin vX.Y.Z
 
 gh release create vX.Y.Z \
   --title "vX.Y.Z" \
