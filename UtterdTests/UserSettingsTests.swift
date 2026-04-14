@@ -18,6 +18,7 @@ struct UserSettingsTests {
         #expect(settings.summarizationEnabled == false)
         #expect(settings.titleGenerationEnabled == false)
         #expect(settings.defaultFolderName == nil)
+        #expect(settings.launchAtLogin == false)
     }
 
     @Test("titleGenerationEnabled persists across re-init")
@@ -32,6 +33,20 @@ struct UserSettingsTests {
 
         let reloaded = UserSettings(defaults: defaults)
         #expect(reloaded.titleGenerationEnabled == true)
+    }
+
+    @Test("launchAtLogin persists across re-init")
+    @MainActor
+    func launchAtLoginPersists() {
+        let suiteName = "test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = UserSettings(defaults: defaults)
+        settings.launchAtLogin = true
+
+        let reloaded = UserSettings(defaults: defaults)
+        #expect(reloaded.launchAtLogin == true)
     }
 
     @Test("summarizationEnabled persists across re-init")
