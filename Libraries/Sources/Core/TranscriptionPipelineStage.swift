@@ -22,7 +22,7 @@ public final class TranscriptionPipelineStage: Sendable {
     /// - Returns: The transcription result on success, or `nil` on failure.
     public func process(_ record: MemoRecord) async -> TranscriptionResult? {
         let tempURL = FileManager.default.temporaryDirectory
-            .appending(path: "\(UUID().uuidString).m4a")
+            .appending(path: "\(UUID().uuidString).\(record.fileURL.pathExtension)")
 
         do {
             try FileManager.default.copyItem(at: record.fileURL, to: tempURL)
