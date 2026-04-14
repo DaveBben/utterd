@@ -52,7 +52,7 @@ Utterd is a macOS menu bar daemon that automatically turns voice memos into Appl
 
 ```
 iCloud Sync ──▶ [File Watcher] ──▶ [Transcribe] ──▶ [LLM: summarize/title] ──▶ Apple Notes
-  (.m4a files)                        (on-device)      (on-device)        (AppleScript)
+  (.m4a / .qta files)                  (on-device)      (on-device)        (AppleScript)
                                                     On-device Foundation Model (macOS 26+)
 ```
 
@@ -62,7 +62,7 @@ iCloud Sync ──▶ [File Watcher] ──▶ [Transcribe] ──▶ [LLM: summ
 - Exactly-once processing via persistent dedup store — checked before processing, written after successful creation
 
 **Data flow:**
-A new .m4a file arrives in the watched directory → copied to a temp location → audio transcribed via on-device speech-to-text → transcript optionally summarized and titled by on-device LLM → note created in Apple Notes via AppleScript → file identity recorded in dedup store → temp copy cleaned up. On macOS 15–25, the pipeline does not start; memos are not processed until the user upgrades to macOS 26+.
+A new .m4a or .qta file arrives in the watched directory → copied to a temp location → audio transcribed via on-device speech-to-text → transcript optionally summarized and titled by on-device LLM → note created in Apple Notes via AppleScript → file identity recorded in dedup store → temp copy cleaned up. On macOS 15–25, the pipeline does not start; memos are not processed until the user upgrades to macOS 26+.
 
 ---
 
@@ -151,7 +151,7 @@ class BadModel: ObservableObject {
 
 | Service | Purpose | Auth | Docs |
 |---------|---------|------|------|
-| iCloud Voice Memos sync directory | Source of .m4a voice memo files | Disk access permission | `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` |
+| iCloud Voice Memos sync directory | Source of .m4a and .qta voice memo files | Disk access permission | `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings` |
 | macOS Foundation Model (macOS 26+) | On-device LLM for optional summarization and title generation | None (on-device) | Apple platform docs |
 | AppleScript (NSAppleScript) | Notes item creation with folder targeting | Automation permission | Apple AppleScript docs |
 | FSEvents (CoreServices) | File system monitoring for new voice memos | Disk access permission | Apple FSEvents docs |
