@@ -1,5 +1,6 @@
 import AppKit
 import Core
+import os
 import ServiceManagement
 import SwiftUI
 
@@ -11,6 +12,7 @@ struct SettingsView: View {
     @State private var model: SettingsRoutingModel?
 
     private let notesService: any NotesService
+    private let logger = Logger(subsystem: "com.bennett.Utterd", category: "Settings")
 
     init(notesService: any NotesService = AppleScriptNotesService()) {
         self.notesService = notesService
@@ -122,9 +124,13 @@ struct SettingsView: View {
                                 try SMAppService.mainApp.unregister()
                             }
                         } catch {
+                            logger.error("Failed to \(newValue ? "register" : "unregister") login item: \(error)")
                             settings.launchAtLogin = currentlyEnabled
                         }
                     }
+            }
+            .onAppear {
+                settings.launchAtLogin = SMAppService.mainApp.status == .enabled
             }
 
             Section("About") {
@@ -145,9 +151,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            settings.launchAtLogin = SMAppService.mainApp.status == .enabled
-        }
         .frame(width: 480, height: 520)
         .task {
             let routingModel = SettingsRoutingModel(notesService: notesService, settings: settings)
