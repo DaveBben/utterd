@@ -79,6 +79,37 @@ guard let context = CGContext(
 }
 
 // ---------------------------------------------------------------------------
+// Clip to macOS squircle (continuous superellipse)
+// Superellipse parametric form: x = a·sign(cos t)·|cos t|^(2/n)
+//                               y = b·sign(sin t)·|sin t|^(2/n)
+// n ≈ 5 matches macOS's continuous corner curve (~22% corner radius).
+// ---------------------------------------------------------------------------
+
+let s = CGFloat(size)
+let halfS = s / 2.0
+let n: CGFloat = 5.0
+let exp2n = 2.0 / n
+
+let squirclePath = CGMutablePath()
+let steps = 360
+for i in 0...steps {
+    let angle = CGFloat(i) * (2.0 * .pi) / CGFloat(steps)
+    let cosA = cos(angle)
+    let sinA = sin(angle)
+    let px = halfS + halfS * copysign(pow(abs(cosA), exp2n), cosA)
+    let py = halfS + halfS * copysign(pow(abs(sinA), exp2n), sinA)
+    if i == 0 {
+        squirclePath.move(to: CGPoint(x: px, y: py))
+    } else {
+        squirclePath.addLine(to: CGPoint(x: px, y: py))
+    }
+}
+squirclePath.closeSubpath()
+
+context.addPath(squirclePath)
+context.clip()
+
+// ---------------------------------------------------------------------------
 // Draw background: radial gradient (blue, extended-sRGB 0,0.533,1.0)
 // The .icon format "automatic gradient" produces a lighter center fading
 // to the full base color at the edges — a subtle depth effect.
@@ -109,10 +140,11 @@ guard let gradient = CGGradient(
     exit(1)
 }
 
-let center = CGPoint(x: CGFloat(size) * 0.5, y: CGFloat(size) * 0.5)
-let radius = CGFloat(size) * 0.70   // gradient covers ~70% radius; corners are edge color
+let center = CGPoint(x: halfS, y: halfS)
+let radius = s * 0.70   // gradient covers ~70% radius; edges are edge color
 
-// Fill entire canvas with edge color first so corners match
+// Fill clipped region with edge color so areas beyond the gradient radius
+// (but inside the squircle) get the base blue, not transparent black.
 context.setFillColor(edgeColor)
 context.fill(CGRect(x: 0, y: 0, width: size, height: size))
 

@@ -6,8 +6,9 @@
 // Note: invoke with an absolute or relative path only — tilde (~) is not expanded.
 
 import CoreGraphics
-import CoreImage
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 // ---------------------------------------------------------------------------
 // Resolve output path
@@ -55,12 +56,12 @@ guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
     exit(1)
 }
 
-// premultipliedLast: alpha is stored in the last channel and pre-multiplied.
-// This ensures the PNG written by CIContext has alpha=255 (fully opaque)
-// everywhere. noneSkipLast (the previous setting) caused CIFormat.RGBX8 to
-// write the X byte as 0, producing a transparent PNG that Finder rendered as
-// the default window background instead of the dark gradient.
-let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+// noneSkipLast: the 4th byte per pixel is padding, not alpha. The resulting
+// CGImage declares "no alpha channel", so CGImageDestination writes a 3-channel
+// RGB PNG. An RGB-only PNG is critical — Finder's icon-label brightness
+// detection misreads RGBA backgrounds (even with alpha=255) and defaults to
+// black text instead of white.
+let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
 guard let context = CGContext(
     data: nil,
     width: width,
@@ -120,24 +121,18 @@ guard let cgImage = context.makeImage() else {
     exit(1)
 }
 
-let ciImage = CIImage(cgImage: cgImage)
-// Software renderer avoids GPU/Metal init overhead for a one-shot offline
-// script and prevents macOS from triggering GPU privacy prompts.
-let ciContext = CIContext(options: [.useSoftwareRenderer: true])
-
-guard let pngData = ciContext.pngRepresentation(
-    of: ciImage,
-    format: .RGBA8,
-    colorSpace: colorSpace
+// Write via CGImageDestination (ImageIO) which respects the CGImage's
+// alphaInfo. Because the source has noneSkipLast, the output PNG is
+// 3-channel RGB — no alpha channel.
+guard let dest = CGImageDestinationCreateWithURL(
+    outputURL as CFURL, UTType.png.identifier as CFString, 1, nil
 ) else {
-    fputs("Error: could not render PNG data\n", stderr)
+    fputs("Error: could not create image destination at \(outputURL.path)\n", stderr)
     exit(1)
 }
-
-do {
-    try pngData.write(to: outputURL)
-    print("Written: \(outputURL.path)")
-} catch {
-    fputs("Error: could not write PNG to \(outputURL.path): \(error)\n", stderr)
+CGImageDestinationAddImage(dest, cgImage, nil)
+guard CGImageDestinationFinalize(dest) else {
+    fputs("Error: could not finalize PNG at \(outputURL.path)\n", stderr)
     exit(1)
 }
+print("Written: \(outputURL.path)")

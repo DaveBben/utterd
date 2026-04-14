@@ -1,3 +1,4 @@
+import AppKit
 import Core
 import SwiftUI
 
@@ -112,6 +113,15 @@ struct SettingsView: View {
                 LabeledContent("Version") {
                     Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")
                         .foregroundStyle(.secondary)
+                }
+                Button("Open Log File") {
+                    let logURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                        .appendingPathComponent("Utterd/utterd.log")
+                    if FileManager.default.fileExists(atPath: logURL.path) {
+                        NSWorkspace.shared.open(logURL)
+                    } else {
+                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: logURL.deletingLastPathComponent().path)
+                    }
                 }
                 Link("View Releases on GitHub", destination: URL(string: "https://github.com/DaveBben/utterd/releases")!)
             }

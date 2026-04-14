@@ -29,19 +29,12 @@ if ! command -v create-dmg >/dev/null 2>&1; then
   exit 1
 fi
 
-# Verify Finder automation permission — required for create-dmg to set the
-# Applications symlink icon inside the mounted DMG. If this fails, grant access:
+# Verify Finder automation permission — required for creating the Applications
+# alias in the staging directory and for create-dmg's AppleScript window styling.
 #   System Settings > Privacy & Security > Automation → enable Finder for Terminal
 if ! osascript -e 'tell application "Finder" to return 0' >/dev/null 2>&1; then
   echo "Error: Finder automation is not permitted for this process."
   echo "Grant Finder access to Terminal in: System Settings > Privacy & Security > Automation"
-  exit 1
-fi
-
-# Verify DMG background image exists before any build work
-if [[ ! -f "$SCRIPT_DIR/dmg-background.png" ]]; then
-  echo "Error: DMG background image not found at $SCRIPT_DIR/dmg-background.png"
-  echo "Regenerate it with: swift scripts/generate-dmg-background.swift"
   exit 1
 fi
 
@@ -142,21 +135,30 @@ rm -rf "$BUILD_DIR/dmg-staging"
 mkdir -p "$BUILD_DIR/dmg-staging"
 ditto "$APP_PATH" "$BUILD_DIR/dmg-staging/Utterd.app"
 
+echo "==> Creating Applications alias"
+# A Finder alias (not a symlink) preserves the Applications folder icon
+# metadata, which ensures the folder icon displays correctly on macOS 26+.
+# hdiutil create -srcfolder on HFS+ (the default) preserves resource forks.
+osascript <<APPLESCRIPT
+tell application "Finder"
+    set stagingFolder to (POSIX file "$BUILD_DIR/dmg-staging") as alias
+    set appAlias to make alias file at stagingFolder to (POSIX file "/Applications")
+    set name of appAlias to "Applications"
+end tell
+APPLESCRIPT
+
 echo "==> Creating DMG"
-# --app-drop-link creates a symlink to /Applications and uses AppleScript
-# (while the DMG is mounted) to set its icon. Setting the icon on the mounted
-# image is more reliable than pre-staging a Finder alias, because hdiutil does
-# not consistently preserve alias resource fork data through packaging.
-# The Finder automation pre-flight check above ensures this step will succeed.
+# No --background image: Finder respects system appearance without one,
+# so dark-mode users see white text on a dark background automatically.
+# A custom background image forces Finder to always render black text.
 create-dmg \
   --volname "Utterd" \
-  --background "$SCRIPT_DIR/dmg-background.png" \
   --window-pos 200 120 \
   --window-size 600 400 \
   --icon-size 128 \
   --icon "Utterd.app" 150 200 \
   --hide-extension "Utterd.app" \
-  --app-drop-link 450 200 \
+  --icon "Applications" 450 200 \
   --no-internet-enable \
   --format UDZO \
   --hdiutil-quiet \

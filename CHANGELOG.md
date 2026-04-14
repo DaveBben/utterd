@@ -10,12 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - "Voice Memos Not Set Up" alert at launch when the recordings directory is missing, with instructions to open Voice Memos and wait for iCloud sync before relaunching
+- "Open Log File" button in Settings to open `utterd.log` in the default editor
 - Version display and GitHub releases link in the Settings window
-- Styled DMG installer with dark gradient background, app icon at left, and Applications folder alias at right
+- DMG installer with app icon and Applications folder alias, styled via `create-dmg`
 - App icon asset catalog (`Utterd/Resources/Assets.xcassets`) integrated via XcodeGen
-- `scripts/generate-dmg-background.swift`: CoreGraphics script that generates the 1200×800 DMG background image
+- `scripts/compose-icon.swift`: Icon compositing script with squircle mask for transparent corners
 - DMG-level notarization and stapling in the release build script
 - `create-dmg` prerequisite documented in `docs/releasing.md`
+
+### Fixed
+
+- DMG icon label text now renders correctly in both light and dark mode (removed custom background image — Finder forces black text when a background image is set, regardless of brightness)
+- Applications folder icon now displays correctly in DMG (uses Finder alias instead of symlink)
+- App icon corners are now transparent (squircle clipping mask applied during compositing)
 
 ## [1.0.0] - 2026-04-08
 
