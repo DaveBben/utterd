@@ -10,6 +10,7 @@ struct SettingsView: View {
 
     @Environment(UserSettings.self) private var settings
     @State private var model: SettingsRoutingModel?
+    @State private var llmUnavailableAlert = false
 
     private let notesService: any NotesService
     private let logger = Logger(subsystem: "com.bennett.Utterd", category: "Settings")
@@ -22,6 +23,22 @@ struct SettingsView: View {
         if #available(macOS 26, *) { return true }
         return false
     }
+
+    #if compiler(>=6.2)
+    @available(macOS 26, *)
+    private func checkLLMAvailability(revertToggle: ReferenceWritableKeyPath<UserSettings, Bool>) {
+        Task {
+            let service = FoundationModelLLMService()
+            do {
+                _ = try await service.generate(systemPrompt: "Respond with: ok", userPrompt: "test")
+            } catch {
+                logger.error("LLM availability check failed: \(error)")
+                settings[keyPath: revertToggle] = false
+                llmUnavailableAlert = true
+            }
+        }
+    }
+    #endif
 
     var body: some View {
         @Bindable var settings = settings
@@ -77,6 +94,13 @@ struct SettingsView: View {
             Section("LLM") {
                 Toggle("Enable Summarization", isOn: $settings.summarizationEnabled)
                     .disabled(!isMacOS26OrLater)
+                    .onChange(of: settings.summarizationEnabled) { _, newValue in
+                        if newValue {
+                            if #available(macOS 26, *) {
+                                checkLLMAvailability(revertToggle: \.summarizationEnabled)
+                            }
+                        }
+                    }
 
                 if settings.summarizationEnabled {
                     VStack(alignment: .leading, spacing: 4) {
@@ -104,6 +128,13 @@ struct SettingsView: View {
 
                 Toggle("Enable Title Generation", isOn: $settings.titleGenerationEnabled)
                     .disabled(!isMacOS26OrLater)
+                    .onChange(of: settings.titleGenerationEnabled) { _, newValue in
+                        if newValue {
+                            if #available(macOS 26, *) {
+                                checkLLMAvailability(revertToggle: \.titleGenerationEnabled)
+                            }
+                        }
+                    }
 
                 if #unavailable(macOS 26) {
                     Text("Requires macOS 26 or later")
@@ -152,6 +183,16 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 520)
+        .alert("Model Not Available", isPresented: $llmUnavailableAlert) {
+            Button("Open Apple Intelligence Settings") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.appleintelligence") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Button("Dismiss", role: .cancel) {}
+        } message: {
+            Text("Apple Intelligence is not enabled. Enable Apple Intelligence in System Settings to use this feature.")
+        }
         .task {
             let routingModel = SettingsRoutingModel(notesService: notesService, settings: settings)
             model = routingModel
