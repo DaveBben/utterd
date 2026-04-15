@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- LLM toggle availability check: enabling Summarization or Title Generation now probes the on-device model; if Apple Intelligence is not available, the toggle reverts and an alert links to System Settings
 - "Launch at Login" toggle in Settings (System section) — registers Utterd as a macOS login item via `SMAppService.mainApp`, with toggle state synced to actual system status on appear
 - QTA file support: voice memos saved as .qta are now detected and processed alongside .m4a files, with the same 1024-byte minimum threshold and iCloud placeholder filtering
 - "Voice Memos Not Set Up" alert at launch when the recordings directory is missing, with instructions to open Voice Memos and wait for iCloud sync before relaunching
