@@ -1,5 +1,7 @@
 import AppKit
 import Core
+import os
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -10,6 +12,7 @@ struct SettingsView: View {
     @State private var model: SettingsRoutingModel?
 
     private let notesService: any NotesService
+    private let logger = Logger(subsystem: "com.bennett.Utterd", category: "Settings")
 
     init(notesService: any NotesService = AppleScriptNotesService()) {
         self.notesService = notesService
@@ -107,6 +110,27 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Section("System") {
+                Toggle("Launch at Login", isOn: $settings.launchAtLogin)
+                    .onChange(of: settings.launchAtLogin) { _, newValue in
+                        let currentlyEnabled = SMAppService.mainApp.status == .enabled
+                        guard newValue != currentlyEnabled else { return }
+                        do {
+                            if newValue {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
+                            }
+                        } catch {
+                            logger.error("Failed to \(newValue ? "register" : "unregister") login item: \(error)")
+                            settings.launchAtLogin = currentlyEnabled
+                        }
+                    }
+            }
+            .onAppear {
+                settings.launchAtLogin = SMAppService.mainApp.status == .enabled
             }
 
             Section("About") {
