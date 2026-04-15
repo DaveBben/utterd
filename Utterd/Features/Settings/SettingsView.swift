@@ -11,7 +11,8 @@ struct SettingsView: View {
     @Environment(UserSettings.self) private var settings
     @State private var model: SettingsRoutingModel?
     @State private var llmUnavailableAlert = false
-    @State private var llmCheckInFlight = false
+    @State private var summarizationCheckInFlight = false
+    @State private var titleGenerationCheckInFlight = false
 
     private let notesService: any NotesService
     private let logger = Logger(subsystem: "com.bennett.Utterd", category: "Settings")
@@ -27,11 +28,14 @@ struct SettingsView: View {
 
     #if compiler(>=6.2)
     @available(macOS 26, *)
-    private func checkLLMAvailability(revertToggle: ReferenceWritableKeyPath<UserSettings, Bool>) {
-        guard !llmCheckInFlight else { return }
-        llmCheckInFlight = true
+    private func checkLLMAvailability(
+        revertToggle: ReferenceWritableKeyPath<UserSettings, Bool>,
+        inFlight: Binding<Bool>
+    ) {
+        guard !inFlight.wrappedValue else { return }
+        inFlight.wrappedValue = true
         Task {
-            defer { llmCheckInFlight = false }
+            defer { inFlight.wrappedValue = false }
             let service = FoundationModelLLMService()
             do {
                 _ = try await service.generate(systemPrompt: "Respond with: ok", userPrompt: "test")
@@ -101,7 +105,7 @@ struct SettingsView: View {
                     .onChange(of: settings.summarizationEnabled) { _, newValue in
                         if newValue {
                             if #available(macOS 26, *) {
-                                checkLLMAvailability(revertToggle: \.summarizationEnabled)
+                                checkLLMAvailability(revertToggle: \.summarizationEnabled, inFlight: $summarizationCheckInFlight)
                             }
                         }
                     }
@@ -135,7 +139,7 @@ struct SettingsView: View {
                     .onChange(of: settings.titleGenerationEnabled) { _, newValue in
                         if newValue {
                             if #available(macOS 26, *) {
-                                checkLLMAvailability(revertToggle: \.titleGenerationEnabled)
+                                checkLLMAvailability(revertToggle: \.titleGenerationEnabled, inFlight: $titleGenerationCheckInFlight)
                             }
                         }
                     }
