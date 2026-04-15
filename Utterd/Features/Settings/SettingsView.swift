@@ -104,9 +104,11 @@ struct SettingsView: View {
                     .disabled(!isMacOS26OrLater)
                     .onChange(of: settings.summarizationEnabled) { _, newValue in
                         if newValue {
+                            #if compiler(>=6.2)
                             if #available(macOS 26, *) {
                                 checkLLMAvailability(revertToggle: \.summarizationEnabled, inFlight: $summarizationCheckInFlight)
                             }
+                            #endif
                         }
                     }
 
@@ -138,9 +140,11 @@ struct SettingsView: View {
                     .disabled(!isMacOS26OrLater)
                     .onChange(of: settings.titleGenerationEnabled) { _, newValue in
                         if newValue {
+                            #if compiler(>=6.2)
                             if #available(macOS 26, *) {
                                 checkLLMAvailability(revertToggle: \.titleGenerationEnabled, inFlight: $titleGenerationCheckInFlight)
                             }
+                            #endif
                         }
                     }
 
