@@ -11,6 +11,7 @@ struct SettingsView: View {
     @Environment(UserSettings.self) private var settings
     @State private var model: SettingsRoutingModel?
     @State private var llmUnavailableAlert = false
+    @State private var llmCheckInFlight = false
 
     private let notesService: any NotesService
     private let logger = Logger(subsystem: "com.bennett.Utterd", category: "Settings")
@@ -27,7 +28,10 @@ struct SettingsView: View {
     #if compiler(>=6.2)
     @available(macOS 26, *)
     private func checkLLMAvailability(revertToggle: ReferenceWritableKeyPath<UserSettings, Bool>) {
+        guard !llmCheckInFlight else { return }
+        llmCheckInFlight = true
         Task {
+            defer { llmCheckInFlight = false }
             let service = FoundationModelLLMService()
             do {
                 _ = try await service.generate(systemPrompt: "Respond with: ok", userPrompt: "test")
