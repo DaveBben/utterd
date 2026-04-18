@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-18
+
 ### Added
 
 - LLM toggle availability check: enabling Summarization or Title Generation now probes the on-device model; if Apple Intelligence is not available, the toggle reverts and an alert links to System Settings
