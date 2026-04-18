@@ -2,8 +2,7 @@
 
 A macOS menu bar daemon that automatically turns voice memos into Apple Notes.
 It monitors the iCloud Voice Memos sync directory, transcribes audio on-device
-(macOS 26+), and optionally uses an on-device language model to summarize transcripts and generate descriptive titles
-— no manual intervention after setup. Built for a single user who wants frictionless voice capture without thinking about where things go.
+(macOS 26+), and optionally uses an on-device language model to summarize transcripts and generate descriptive titles. Built for a single user who wants frictionless voice capture without thinking about where things go.
 
 ## Tech Stack and Codebase Map
 
@@ -34,24 +33,23 @@ It monitors the iCloud Voice Memos sync directory, transcribes audio on-device
 - `swiftlint lint --strict` — lint (requires SwiftLint installed)
 - `swift-format format -i -r Utterd/ UtterdTests/ Libraries/` — format (requires swift-format installed)
 
-## Critical Reminders
-- Changelog.md should be updated as the codebase changes
-
 ## Critical Constraints
-- Never run swift test while another instance is running. Wait for background processes to complete before retrying.
-- Never run `swift build` or `swift test` in background or in parallel — SwiftPM holds an exclusive lock on `.build/`.
-- When running Swift tests (especially from subagents), prevent hangs from watch/interactive mode:
-  - Always redirect stdin: `swift test </dev/null` — this is the primary fix. It cuts off stdin entirely, signaling unambiguously that this is a non-interactive run.
-  - Pipe output as a secondary signal: `swift test </dev/null 2>&1`
-  - Always wrap with a timeout: `timeout 120 swift test </dev/null`
-  - Subagent prompts must explicitly instruct non-interactive flags when running tests.
-- Use SwiftUI first; drop to AppKit via NSViewRepresentable only when necessary
-- Never modify or delete original voice memo files — only read from temporary copies
-- Build + test must pass before creating a PR: `xcodebuild -scheme Utterd -destination 'platform=macOS' build test`
+- Never run `swift build` or `swift test` in background or in parallel — SwiftPM holds an exclusive lock on `.build/`. Wait for any running instance to finish before retrying.
+- When running Swift tests, prevent hangs from watch/interactive mode:
+  - Redirect stdin: `swift test </dev/null` (primary fix — signals non-interactive run)
+  - Wrap with a timeout: `timeout 120 swift test </dev/null 2>&1`
+  - Subagent prompts must explicitly pass these flags.
+- Use SwiftUI first; drop to AppKit via `NSViewRepresentable` only when necessary.
+- Never modify or delete original voice memo files — only read from temporary copies.
+- Build + test must pass before creating a PR: `xcodebuild -scheme Utterd -destination 'platform=macOS' build test`.
+- Update `CHANGELOG.md` on behavior-visible changes.
+- After significant implementation changes, update `spec.md`'s Current State section. Stale specs are worse than no specs.
 
 ## Pointers to Deeper Docs
 
-- `spec.md` — project spec: goals, architecture decisions, code conventions, testing strategy, boundaries
-- `README.md` — setup instructions and project overview
+- `spec.md` — current state, architecture overview, external dependencies, boundaries, gotchas
+- `README.md` — setup and project overview
+- `CHANGELOG.md` — released and unreleased changes
+- `docs/releasing.md` — release checklist for signed + notarized DMG
 - `project.yml` — XcodeGen project definition (targets, settings, dependencies)
 - `Libraries/Package.swift` — local SPM package definition
