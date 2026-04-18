@@ -51,3 +51,4 @@ Local.xcconfig
 
 # project
 .claude/
+CLAUDE.local.md
